@@ -185,8 +185,11 @@ ConfigContainer::ConfigContainer()
 		"podcast-auto-enqueue",
 		ConfigData("no", ConfigDataType::BOOL)},
 	{
-		"podcast-to-mpd",
-		ConfigData("no", ConfigDataType::BOOL)},
+		"podcast-plugin",
+		ConfigData("podboat", ConfigDataType::STR)},
+	{
+		"plugin-path",
+		ConfigData(PLUGINSDIR, ConfigDataType::STR)},
 	{
 		"mpd-host",
 		ConfigData("", ConfigDataType::STR)},

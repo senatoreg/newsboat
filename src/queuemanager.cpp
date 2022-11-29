@@ -12,213 +12,51 @@
 
 namespace newsboat {
 
-QueueManager::QueueManager(ConfigContainer* cfg_, std::string queue_file)
+	QueueManager::QueueManager(ConfigContainer* cfg_, std::string queue_file)
 	: cfg(cfg_)
 	, queue_file(std::move(queue_file))
 {}
 
-void QueueManager::deinit()
-{
-	if (cfg->get_configvalue_as_bool("podcast-to-mpd") && (mpd_handle != NULL)) {
-		int ret = dlclose(mpd_handle);
-                if (ret > 0) {
-			std::cout << "Unloading libmpdclient failed: " << dlerror() << "\n";
-                }
+QueueManager::~QueueManager()
+{}
+
+void QueueManager::init() {
+	plugin_init_t plugin_init;
+
+	std::string plugin_file = cfg->get_configvalue("podcast-plugin") + ".so";
+	std::string plugin_path = cfg->get_configvalue("plugin-path");
+	std::string plugin = plugin_path + "/" + plugin_file;
+
+	_plugin_handle = dlopen(plugin.c_str(), RTLD_NOW | RTLD_GLOBAL);
+
+	if (_plugin_handle == NULL) {
+		std::cout << "Cannot load plugin " << plugin << "\n";
+		std::cout << dlerror() << "\n";
+		return;
 	}
+
+        plugin_init = (plugin_init_t) dlsym(_plugin_handle, "plugin_init");
+
+	_queueManager = plugin_init(cfg, queue_file);
+
+	_queueManager->init();
 }
 
-bool QueueManager::init()
-{
-	if (cfg->get_configvalue_as_bool("podcast-to-mpd")) {
-		std::cout << "Setting up mpd...";
+void QueueManager::deinit() {
+	plugin_deinit_t plugin_deinit;
 
-		mpd_handle = dlopen("libmpdclient.so.2", RTLD_LAZY);
+	plugin_deinit = (plugin_deinit_t) dlsym(_plugin_handle, "plugin_deinit");
 
-                if (mpd_handle == nullptr) {
-			std::cout << dlerror() << "\n";
-			return false;
-                }
+	_queueManager->deinit();
 
-		mpd_connection_get_error_ = (mpd_connection_get_error_t) dlsym(mpd_handle, "mpd_connection_get_error");
-		mpd_search_queue_songs_ = (mpd_search_queue_songs_t) dlsym(mpd_handle, "mpd_search_queue_songs");
-		mpd_search_add_uri_constraint_ = (mpd_search_add_uri_constraint_t) dlsym(mpd_handle, "mpd_search_add_uri_constraint");
-		mpd_search_commit_ = (mpd_search_commit_t) dlsym(mpd_handle, "mpd_search_commit");
-		mpd_recv_song_ = (mpd_recv_song_t) dlsym(mpd_handle, "mpd_recv_song");
-		mpd_run_add_ = (mpd_run_add_t) dlsym(mpd_handle, "mpd_run_add");
-		mpd_connection_free_ = (mpd_connection_free_t) dlsym(mpd_handle, "mpd_connection_free");
-		mpd_connection_new_ = (mpd_connection_new_t) dlsym(mpd_handle, "mpd_connection_new");
-
-		std::cout << "done" << "\n";
-		return true;
-        } else {
-		return false;
-        }
+	plugin_deinit(_queueManager);
 }
 
+/// Adds the podcast URL to Podboat's queue file
 EnqueueResult QueueManager::enqueue_url(std::shared_ptr<RssItem> item,
-	std::shared_ptr<RssFeed> feed)
+			  std::shared_ptr<RssFeed> feed)
 {
-	const std::string& url = item->enclosure_url();
-	const std::string filename = generate_enqueue_filename(item, feed);
-
-	/*
-	 * If "podcast-to-mpd" option is set to "yes" the url is passed to mpd
-	 * by opening a new connection using the libmpdclient function.
-	 * The newly created connection life cycle is this submission execution,
-	 * so it is closed in case of any connection error, or when the url is
-	 * enqueued successfully of course.
-	 * Using the mpd queue search function, the case of already enqueued uri
-	 * is also checked out.
-	 * Since the standard enqueue behaviour is also preserved, the following
-	 * conditional statement is completely self consistent, so if the
-	 * "podcast-to-mpd" option is set to "no" (default value), it is bypassed
-	 * in favour of podboat.
-	 */
-	if (cfg->get_configvalue_as_bool("podcast-to-mpd")) {
-		EnqueueResult res;
-		std::string mpd_host = cfg->get_configvalue("mpd-host");
-		mpd_error err;
-		int songs = 0;
-
-                if (!mpd_host.empty())
-			mpd_connection = mpd_connection_new_(mpd_host.c_str(), cfg->get_configvalue_as_int("mpd-port"),
-							     cfg->get_configvalue_as_int("mpd-timeout") * 1000);
-                else
-			mpd_connection = mpd_connection_new_(nullptr, cfg->get_configvalue_as_int("mpd-port"),
-							     cfg->get_configvalue_as_int("mpd-timeout") * 1000);
-
-                err = mpd_connection_get_error_(mpd_connection);
-		if (err != MPD_ERROR_SUCCESS) {
-			std::string err_msg(mpd_connection_get_error_message_(mpd_connection));
-                        return {EnqueueStatus::QUEUE_FILE_OPEN_ERROR, "Error connecting to MPD (" + err_msg + ")"};
-                }
-
-		mpd_search_queue_songs_(mpd_connection, true);
-		mpd_search_add_uri_constraint_(mpd_connection,
-					      MPD_OPERATOR_DEFAULT,
-					      url.c_str());
-		mpd_search_commit_(mpd_connection);
-
-		err = mpd_connection_get_error_(mpd_connection);
-                if (err != MPD_ERROR_SUCCESS) {
-			std::string err_msg(mpd_connection_get_error_message_(mpd_connection));
-			mpd_connection_free_(mpd_connection);
-                        return {EnqueueStatus::QUEUE_FILE_OPEN_ERROR, "MPD search failed (" + err_msg + ")"};
-                }
-
-		struct mpd_song* song;
-		while ((song = mpd_recv_song_(mpd_connection)) != NULL) {
-			songs++;
-		}
-
-                if (songs > 0) {
-			mpd_connection_free_(mpd_connection);
-			return {EnqueueStatus::URL_QUEUED_ALREADY, url};
-                }
-
-		mpd_run_add_(mpd_connection, url.c_str());
-		err = mpd_connection_get_error_(mpd_connection);
-                if (err != MPD_ERROR_SUCCESS) {
-			std::string err_msg(mpd_connection_get_error_message_(mpd_connection));
-			mpd_connection_free_(mpd_connection);
-                        return {EnqueueStatus::QUEUE_FILE_OPEN_ERROR, "MPD connection error (" + err_msg + ")"};
-		}
-		mpd_connection_free_(mpd_connection);
-		return {EnqueueStatus::QUEUED_SUCCESSFULLY, ""};
-	}
-
-	std::fstream f;
-	f.open(queue_file, std::fstream::in);
-	if (f.is_open()) {
-		do {
-			std::string line;
-			getline(f, line);
-			if (!f.eof() && !line.empty()) {
-				const auto fields = utils::tokenize_quoted(line);
-				if (fields.size() >= 1 && fields[0] == url) {
-					return {EnqueueStatus::URL_QUEUED_ALREADY, url};
-				}
-				if (fields.size() >= 2 && fields[1] == filename) {
-					return {EnqueueStatus::OUTPUT_FILENAME_USED_ALREADY, filename};
-				}
-			}
-		} while (!f.eof());
-		f.close();
-	}
-
-	f.open(queue_file, std::fstream::app | std::fstream::out);
-	if (!f.is_open()) {
-		return {EnqueueStatus::QUEUE_FILE_OPEN_ERROR, queue_file};
-	}
-	f << url << " " << utils::quote(filename) << std::endl;
-	f.close();
-
-	item->set_enqueued(true);
-
-	return {EnqueueStatus::QUEUED_SUCCESSFULLY, ""};
-}
-
-std::string get_hostname_from_url(const std::string& url)
-{
-	xmlURIPtr uri = xmlParseURI(url.c_str());
-	std::string hostname;
-	if (uri) {
-		hostname = uri->server;
-		xmlFreeURI(uri);
-	}
-	return hostname;
-}
-
-std::string QueueManager::generate_enqueue_filename(
-	std::shared_ptr<RssItem> item,
-	std::shared_ptr<RssFeed> feed)
-{
-	const std::string& url = item->enclosure_url();
-	const std::string& title = utils::utf8_to_locale(item->title());
-	const time_t pubDate = item->pubDate_timestamp();
-
-	std::string dlformat = cfg->get_configvalue("download-path");
-	if (dlformat[dlformat.length() - 1] != NEWSBEUTER_PATH_SEP) {
-		dlformat.push_back(NEWSBEUTER_PATH_SEP);
-	}
-
-	const std::string filemask = cfg->get_configvalue("download-filename-format");
-	dlformat.append(filemask);
-
-	const std::string base = utils::get_basename(url);
-	std::string extension;
-	const std::size_t pos = base.rfind('.');
-	if (pos != std::string::npos) {
-		extension.append(base.substr(pos + 1));
-	}
-
-	FmtStrFormatter fmt;
-	fmt.register_fmt('n', utils::replace_all(feed->title(), "/", "_"));
-	fmt.register_fmt('h', get_hostname_from_url(url));
-	fmt.register_fmt('u', base);
-	fmt.register_fmt('F', utils::mt_strf_localtime("%F", pubDate));
-	fmt.register_fmt('m', utils::mt_strf_localtime("%m", pubDate));
-	fmt.register_fmt('b', utils::mt_strf_localtime("%b", pubDate));
-	fmt.register_fmt('d', utils::mt_strf_localtime("%d", pubDate));
-	fmt.register_fmt('H', utils::mt_strf_localtime("%H", pubDate));
-	fmt.register_fmt('M', utils::mt_strf_localtime("%M", pubDate));
-	fmt.register_fmt('S', utils::mt_strf_localtime("%S", pubDate));
-	fmt.register_fmt('y', utils::mt_strf_localtime("%y", pubDate));
-	fmt.register_fmt('Y', utils::mt_strf_localtime("%Y", pubDate));
-	fmt.register_fmt('t', utils::replace_all(title, "/", "_"));
-	fmt.register_fmt('e', utils::replace_all(extension, "/", "_"));
-
-	if (feed->rssurl() != item->feedurl() &&
-		item->get_feedptr() != nullptr) {
-		std::string feedtitle = item->get_feedptr()->title();
-		utils::remove_soft_hyphens(feedtitle);
-		fmt.register_fmt('N', utils::replace_all(feedtitle, "/", "_"));
-	} else {
-		fmt.register_fmt('N', utils::replace_all(feed->title(), "/", "_"));
-	}
-
-	const std::string dlpath = fmt.do_format(dlformat);
-	return dlpath;
+	return _queueManager->enqueue_url(item, feed);
 }
 
 EnqueueResult QueueManager::autoenqueue(std::shared_ptr<RssFeed> feed)
