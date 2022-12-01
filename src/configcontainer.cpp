@@ -185,6 +185,12 @@ ConfigContainer::ConfigContainer()
 		"podcast-auto-enqueue",
 		ConfigData("no", ConfigDataType::BOOL)},
 	{
+		"podcast-plugin",
+		ConfigData("podboatqueuemanager", ConfigDataType::STR)},
+	{
+		"plugin-path",
+		ConfigData(PLUGINSDIR, ConfigDataType::STR)},
+	{
 		"podlist-format",
 		ConfigData( "%4i [%6dMB/%6tMB] [%5p %%] [%12K] %-20S %u -> %F", ConfigDataType::STR)},
 	{
@@ -332,6 +338,11 @@ ConfigContainer::ConfigContainer()
 		"wrap-scroll",
 		ConfigData("no", ConfigDataType::BOOL)},
 }
+{
+}
+
+ConfigContainer::ConfigContainer(std::map<std::string, ConfigData> config_data_)
+	: config_data(config_data_)
 {
 }
 

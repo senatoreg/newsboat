@@ -1,5 +1,6 @@
 # important directories
 prefix?=/usr/local
+pluginsdir?=$(prefix)/lib/newsboat
 mandir?=$(prefix)/share/man
 datadir?=$(prefix)/share
 localedir?=$(datadir)/locale
@@ -21,10 +22,11 @@ CXX_FOR_BUILD?=$(CXX)
 
 # compiler and linker flags
 DEFINES=-DLOCALEDIR='"$(localedir)"'
+DEFINES+=-DPLUGINSDIR='"$(pluginsdir)"'
 
 WARNFLAGS=-Werror -Wall -Wextra -Wunreachable-code
 INCLUDES=-Iinclude -Istfl -Ifilter -I. -Irss -I$(CARGO_TARGET_DIR)/cxxbridge/
-BARE_CXXFLAGS=-std=c++11 -O2 -ggdb $(INCLUDES)
+BARE_CXXFLAGS=-std=c++11 -O2 -ggdb $(INCLUDES) -fPIC
 LDFLAGS+=-L.
 
 # Constants
@@ -69,10 +71,14 @@ PODBOAT_LIBS=-lboat -lnewsboat -lfilter -lpthread -ldl
 
 TEST_SRCS:=$(wildcard test/*.cpp test/test_helpers/*.cpp)
 TEST_OBJS:=$(patsubst %.cpp,%.o,$(TEST_SRCS))
-SRC_SRCS:=$(wildcard src/*.cpp)
+SRC_SRCS:=$(wildcard src/*.cpp src/plugins/*.cpp)
 SRC_OBJS:=$(patsubst %.cpp,%.o,$(SRC_SRCS))
 
-CPP_SRCS:=$(LIB_SRCS) $(FILTERLIB_SRCS) $(NEWSBOAT_SRCS) $(RSSPPLIB_SRCS) $(PODBOAT_SRCS) $(TEST_SRCS)
+PLUGINS_SRCS:=$(wildcard src/plugins/*.cpp)
+PLUGINS_OBJS:=$(patsubst %.cpp,%.o,$(PLUGINS_SRCS))
+PLUGINS:=$(patsubst %.o,%.so,$(PLUGINS_OBJS))
+
+CPP_SRCS:=$(LIB_SRCS) $(FILTERLIB_SRCS) $(NEWSBOAT_SRCS) $(RSSPPLIB_SRCS) $(PODBOAT_SRCS) $(TEST_SRCS) $(PLUGINS_SRCS)
 CPP_DEPS:=$(addprefix .deps/,$(CPP_SRCS))
 # Sorting removes duplicate items, which prevents Make from spewing warnings
 # about repeated items in the target that creates these directories
@@ -120,7 +126,7 @@ CARGO=cargo
 TEXTCONV=./txt2h
 RM=rm -f
 
-all: doc $(NEWSBOAT) $(PODBOAT) mo-files
+all: doc $(NEWSBOAT) $(PODBOAT) mo-files $(PLUGINS)
 
 NB_DEPS=xlicense.h $(LIB_OUTPUT) $(FILTERLIB_OUTPUT) $(NEWSBOAT_OBJS) $(RSSPPLIB_OUTPUT) $(NEWSBOATLIB_OUTPUT)
 
@@ -128,7 +134,7 @@ $(NEWSBOATLIB_OUTPUT): $(RUST_SRCS) Cargo.lock
 	+$(CARGO) build --package libnewsboat-ffi $(CARGO_BUILD_FLAGS)
 
 $(NEWSBOAT): $(NB_DEPS)
-	$(CXX) $(CXXFLAGS) -o $(NEWSBOAT) $(NEWSBOAT_OBJS) $(NEWSBOAT_LIBS) $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $(NEWSBOAT) -Wl,--export-dynamic $(NEWSBOAT_OBJS) $(NEWSBOAT_LIBS) $(LDFLAGS)
 
 $(PODBOAT): $(LIB_OUTPUT) $(NEWSBOATLIB_OUTPUT) $(PODBOAT_OBJS) $(FILTERLIB_OUTPUT)
 	$(CXX) $(CXXFLAGS) -o $(PODBOAT) $(PODBOAT_OBJS) $(PODBOAT_LIBS) $(LDFLAGS)
@@ -147,6 +153,11 @@ $(FILTERLIB_OUTPUT): $(FILTERLIB_OBJS)
 	$(RM) $@
 	$(AR) qc $@ $^
 	$(RANLIB) $@
+
+#$(PLUGINS): $(PLUGINS_OBJS)
+src/plugins/%.so: src/plugins/%.o
+	echo $(PLUGINS)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $<
 
 test: test/test rust-test
 

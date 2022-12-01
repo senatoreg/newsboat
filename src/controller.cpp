@@ -84,12 +84,13 @@ Controller::Controller(ConfigPaths& configpaths)
 	, refresh_on_start(false)
 	, api(0)
 	, configpaths(configpaths)
-	, queueManager(&cfg, configpaths.queue_file())
+	, queueManager(&cfg)
 {
 }
 
 Controller::~Controller()
 {
+	queueManager.deinit();
 	delete rsscache;
 	delete urlcfg;
 	delete api;
@@ -190,6 +191,8 @@ int Controller::run(const CliArgsParser& args)
 	if (!args.silent()) {
 		std::cout << _("done.") << std::endl;
 	}
+
+	queueManager.init();
 
 	// create cache object
 	std::string cachefilepath = cfg.get_configvalue("cache-file");

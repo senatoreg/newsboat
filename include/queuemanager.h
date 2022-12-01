@@ -7,6 +7,7 @@
 namespace newsboat {
 
 class ConfigContainer;
+class ConfigPaths;
 class RssFeed;
 class RssItem;
 
@@ -24,26 +25,33 @@ struct EnqueueResult {
 
 class QueueManager {
 	ConfigContainer* cfg = nullptr;
-	std::string queue_file;
+	std::string _name;
+	void* _plugin_handle;
+	QueueManager* _queueManager;
 
 public:
 	/// Construct `QueueManager` instance out of a config container and a path
 	/// to the queue file.
-	QueueManager(ConfigContainer* cfg, std::string queue_file);
+	QueueManager() {};
+	QueueManager(ConfigContainer *cfg);
+	virtual ~QueueManager();
+	virtual std::string &getName() { return _name; };
+
+	virtual void init();
+	virtual void deinit();
 
 	/// Adds the podcast URL to Podboat's queue file
-	EnqueueResult enqueue_url(std::shared_ptr<RssItem> item,
-		std::shared_ptr<RssFeed> feed);
+	virtual EnqueueResult enqueue_url(std::shared_ptr<RssItem> item,
+					  std::shared_ptr<RssFeed> feed);
 
 	/// Add all HTTP and HTTPS enclosures to the queue file
 	EnqueueResult autoenqueue(std::shared_ptr<RssFeed> feed);
-
-private:
-	std::string generate_enqueue_filename(std::shared_ptr<RssItem> item,
-		std::shared_ptr<RssFeed> feed);
 };
 
 }
+
+typedef newsboat::QueueManager* (*plugin_init_t)();
+typedef void (*plugin_deinit_t)(newsboat::QueueManager*);
 
 #endif /* NEWSBOAT_QUEUEMANAGER_H_ */
 

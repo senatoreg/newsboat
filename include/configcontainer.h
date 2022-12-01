@@ -59,6 +59,7 @@ struct ArticleSortStrategy {
 class ConfigContainer : public ConfigActionHandler {
 public:
 	ConfigContainer();
+	ConfigContainer(std::map<std::string, ConfigData> config_data);
 	~ConfigContainer() override;
 	void register_commands(ConfigParser& cfgparser);
 	void handle_action(const std::string& action,
