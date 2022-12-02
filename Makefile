@@ -154,9 +154,7 @@ $(FILTERLIB_OUTPUT): $(FILTERLIB_OBJS)
 	$(AR) qc $@ $^
 	$(RANLIB) $@
 
-#$(PLUGINS): $(PLUGINS_OBJS)
 src/plugins/%.so: src/plugins/%.o
-	echo $(PLUGINS)
 	$(CXX) $(CXXFLAGS) -shared -o $@ $<
 
 test: test/test rust-test
@@ -333,7 +331,11 @@ cppcheck:
 
 install-newsboat: $(NEWSBOAT)
 	$(MKDIR) $(DESTDIR)$(prefix)/bin
+	$(MKDIR) $(DESTDIR)$(pluginsdir)
 	$(INSTALL) $(NEWSBOAT) $(DESTDIR)$(prefix)/bin
+	for f in $(PLUGINS) ; \
+		$(INSTALL) $$f $(DESTDIR)$(pluginsdir) ; \
+	done
 
 install-podboat: $(PODBOAT)
 	$(MKDIR) $(DESTDIR)$(prefix)/bin
