@@ -1,4 +1,4 @@
-use libc::c_char;
+use libc::{c_char, c_ulong};
 use libnewsboat::utils::{self, *};
 use std::ffi::{CStr, CString};
 use std::path::{Path, PathBuf};
@@ -89,7 +89,6 @@ mod bridged {
         fn translit(tocode: &str, fromcode: &str) -> String;
         fn utf8_to_locale(text: &str) -> Vec<u8>;
         fn locale_to_utf8(text: &[u8]) -> String;
-        fn convert_text(text: &[u8], tocode: &str, fromcode: &str) -> Vec<u8>;
     }
 
     extern "C++" {
@@ -103,7 +102,16 @@ mod bridged {
 }
 
 fn get_auth_method(method: &str) -> u64 {
-    utils::get_auth_method(method) as u64
+    let result: c_ulong = utils::get_auth_method(method);
+    #[cfg(target_pointer_width = "32")]
+    {
+        // On 32-bit platforms, upcast
+        result as u64
+    }
+    #[cfg(target_pointer_width = "64")]
+    {
+        result
+    }
 }
 
 fn run_interactively(command: &str, caller: &str, exit_code: &mut u8) -> bool {

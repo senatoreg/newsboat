@@ -56,7 +56,7 @@ Newsboat binaries are available in a number of repositories:
 The most up-to-date source code can always be downloaded from the Git
 repository:
 
-	$ git clone git://github.com/newsboat/newsboat.git
+	$ git clone https://github.com/newsboat/newsboat.git
 
 There are also signed release tarballs available from https://newsboat.org/[our
 website].
@@ -77,7 +77,7 @@ Debian and derivatives, headers are in `-dev` packages, e.g. `libsqlite3-dev`.)
   points to our own fork because http://www.clifford.at/stfl/[the upstream] is
   dead)
 - https://www.sqlite.org/download.html[SQLite3 (version 3.5 or newer)]
-- https://curl.haxx.se/download.html[libcurl (version 7.21.6 or newer)]
+- https://curl.haxx.se/download.html[libcurl (version 7.32.0 or newer)]
 - Header files for the SSL library that libcurl uses. You can find out which
     library that is from the output of `curl --version`; most often that's
     OpenSSL, sometimes GnuTLS, or maybe something else.
@@ -1313,12 +1313,12 @@ normally run, such as a web browser or an executable script. For example:
   browser firefox
 
 The browser command also takes an optional `%u` to specify at which point the
-URL should be expanded, along with `%t` specifying where the type of the URL
-should be expanded and `%F` specifying where the URL of the feed's website (or
-the URL of the feed itself if not available) should be expanded. All parameters
-will be enclosed in single quotes, making it unnecessary to quote them yourself.
-If none of the parameters are used, the URL will be appended at the end of the
-command. Therefore, the previous example is equivalent to:
+URL should be expanded, `%t` specifying where the type of the URL should be
+expanded, `%T` for the title of the feed/article, and `%F` specifying where
+the URL of the feed's website (or the URL of the feed itself if not available)
+should be expanded. All parameters will be enclosed in single quotes, making it
+unnecessary to quote them yourself. If none of the parameters are used, the URL
+will be appended at the end of the command. Therefore, the previous example is equivalent to:
 
   browser "firefox %u"
 
