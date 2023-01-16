@@ -333,7 +333,7 @@ install-newsboat: $(NEWSBOAT)
 	$(MKDIR) $(DESTDIR)$(prefix)/bin
 	$(MKDIR) $(DESTDIR)$(pluginsdir)
 	$(INSTALL) $(NEWSBOAT) $(DESTDIR)$(prefix)/bin
-	for f in $(PLUGINS) ; \
+	for f in $(PLUGINS) ; do \
 		$(INSTALL) $$f $(DESTDIR)$(pluginsdir) ; \
 	done
 
