@@ -451,6 +451,8 @@ static const std::vector<OpDesc> opdescs = {
 		translatable("Move to the next page"),
 		KM_SYSKEYS
 	},
+	{OP_SK_HALF_PAGE_UP, "halfpageup", "", translatable("Move half page up"), KM_SYSKEYS},
+	{OP_SK_HALF_PAGE_DOWN, "halfpagedown", "", translatable("Move half page down"), KM_SYSKEYS},
 
 	{
 		OP_SK_HOME,
@@ -465,35 +467,6 @@ static const std::vector<OpDesc> opdescs = {
 		"END",
 		translatable("Move to the end of page/list"),
 		KM_SYSKEYS
-	},
-
-	{
-		OP_INT_END_QUESTION,
-		"XXXNOKEY-end-question",
-		"end-question",
-		"",
-		KM_INTERNAL
-	},
-	{
-		OP_INT_CANCEL_QNA,
-		"XXXNOKEY-cancel-qna",
-		"cancel-qna",
-		"",
-		KM_INTERNAL
-	},
-	{
-		OP_INT_QNA_NEXTHIST,
-		"XXXNOKEY-qna-next-history",
-		"qna-next-history",
-		"",
-		KM_INTERNAL
-	},
-	{
-		OP_INT_QNA_PREVHIST,
-		"XXXNOKEY-qna-prev-history",
-		"qna-prev-history",
-		"",
-		KM_INTERNAL
 	},
 
 	{OP_INT_SET, "set", "internal-set", "", KM_INTERNAL},

@@ -78,9 +78,8 @@ void print_usage(const std::string& argv0, const std::string& config_path,
 			'l',
 			"log-level",
 			_s("<loglevel>"),
-			_s("write a log with a certain loglevel (valid values: "
-				"1 to "
-				"6)")
+			_s("write a log with a certain log level (valid values: 1 to 6,"
+				" for user error, critical, error, warning, info, and debug respectively)")
 		},
 		{
 			'd',
@@ -161,11 +160,11 @@ void print_version(const std::string& argv0, unsigned int level)
 			<< PROGRAM_URL << std::endl;
 		ss << "Copyright (C) 2006-2015 Andreas Krennmair"
 			<< std::endl;
-		ss << "Copyright (C) 2015-2022 Alexander Batischev"
+		ss << "Copyright (C) 2015-2023 Alexander Batischev"
 			<< std::endl;
 		ss << "Copyright (C) 2006-2017 Newsbeuter contributors"
 			<< std::endl;
-		ss << "Copyright (C) 2017-2022 Newsboat contributors"
+		ss << "Copyright (C) 2017-2023 Newsboat contributors"
 			<< std::endl;
 		ss << std::endl;
 

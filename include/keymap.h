@@ -114,7 +114,8 @@ enum Operation {
 	OP_SK_DOWN,
 	OP_SK_PGUP,
 	OP_SK_PGDOWN,
-	/* TODO: add more user-defined keys here */
+	OP_SK_HALF_PAGE_UP,
+	OP_SK_HALF_PAGE_DOWN,
 	OP_SK_HOME,
 	OP_SK_END,
 
@@ -130,11 +131,6 @@ enum Operation {
 	OP_INT_GOTO_TITLE,
 
 	OP_INT_GOTO_URL,
-
-	OP_INT_END_QUESTION,
-	OP_INT_CANCEL_QNA,
-	OP_INT_QNA_NEXTHIST,
-	OP_INT_QNA_PREVHIST,
 
 	OP_INT_SET,
 

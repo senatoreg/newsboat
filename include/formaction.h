@@ -71,6 +71,10 @@ public:
 	void start_qna(const std::vector<QnaPair>& prompts,
 		Operation finish_op,
 		History* h = nullptr);
+	void finish_qna_question();
+	void cancel_qna();
+	void qna_next_history();
+	void qna_previous_history();
 
 	void set_parent_formaction(std::shared_ptr<FormAction> fa)
 	{
@@ -102,6 +106,10 @@ protected:
 		bool automatic = false,
 		std::vector<std::string>* args = nullptr) = 0;
 	virtual void set_keymap_hints();
+
+	/// The name of the "main" STFL widget, i.e. the one that should be focused
+	/// by default.
+	virtual std::string main_widget() const = 0;
 
 	void start_bookmark_qna(const std::string& default_title,
 		const std::string& default_url,

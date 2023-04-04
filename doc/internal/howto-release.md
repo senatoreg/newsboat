@@ -59,7 +59,7 @@ branch off the latest release and backport the bugfixes onto it.
     * Acknowledge contributions from people whose changes didn't make it into
         the lists. The full list of contributors can be got with:
         ```
-        $ git shortlog PREVIOUS_VERSION.. | egrep -v '^(\s|$)' | sed -r 's# \([[:digit:]]+\):$##'
+        $ git shortlog PREVIOUS_VERSION.. | cut -f2
         ```
 1. Update version:
     * _rust/libnewsboat/Cargo.toml_
@@ -86,7 +86,8 @@ branch off the latest release and backport the bugfixes onto it.
     * Upload contents of `doc/xhtml/` to newsboat.org staging area.
 7. *If you're making a patch release*, merge the tag into the master branch:
 
-        $ git merge r2.22.1 master
+        $ git checkout master
+        $ git merge r2.22.1
 
     This merges our changes to CHANGELOG.
 
@@ -168,6 +169,5 @@ branch off the latest release and backport the bugfixes onto it.
 
 1. Remove the branch you made to backport stuff:
 
-        $ git checkout master
         $ git branch --delete --force feature/2.22.1
         $ git push origin --delete feature/2.22.1
