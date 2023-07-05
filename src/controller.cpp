@@ -505,7 +505,7 @@ int Controller::run(const CliArgsParser& args)
 	feedcontainer.sort_feeds(cfg.get_feed_sort_strategy());
 
 	if (args.do_export()) {
-		export_opml();
+		export_opml(args.export_as_opml2());
 		return EXIT_SUCCESS;
 	}
 
@@ -763,9 +763,9 @@ int Controller::import_opml(const std::string& opmlFile,
 	}
 }
 
-void Controller::export_opml()
+void Controller::export_opml(bool version2)
 {
-	xmlDocPtr root = opml::generate(feedcontainer);
+	xmlDocPtr root = opml::generate(feedcontainer, version2);
 
 	xmlSaveCtxtPtr savectx = xmlSaveToFd(1, nullptr, 1);
 	xmlSaveDoc(savectx, root);

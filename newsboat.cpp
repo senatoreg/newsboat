@@ -45,6 +45,7 @@ void print_usage(const std::string& argv0, const std::string& config_path,
 
 	static const std::vector<arg> args = {
 		{'e', "export-to-opml", "", _s("export OPML feed to stdout")},
+		{'-', "export-to-opml2", "", _s("export OPML 2.0 feed including tags to stdout")},
 		{'r', "refresh-on-start", "", _s("refresh feeds on start")},
 		{'i', "import-from-opml", _s("<file>"), _s("import OPML file")},
 		{
@@ -126,11 +127,11 @@ void print_usage(const std::string& argv0, const std::string& config_path,
 	std::cout << '\n';
 
 	std::cout << _("Files:") << '\n';
-	/// This is printed out by --help before the path to the config file
+	// i18n: This is printed out by --help before the path to the config file
 	const std::string tr_config = _("configuration");
-	/// This is printed out by --help before the path to the urls file
+	// i18n This is printed out by --help before the path to the urls file
 	const std::string tr_urls = _("feed URLs");
-	/// This is printed out by --help before the path to the cache file
+	// i18n This is printed out by --help before the path to the cache file
 	const std::string tr_cache = _("cache");
 	const auto widest = std::max({tr_config.length(), tr_urls.length(), tr_cache.length()});
 

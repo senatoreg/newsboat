@@ -1,61 +1,18 @@
 # All the programs and libraries necessary to build Newsboat with newer
-# compilers. Contains GCC 12 and Rust 1.70.0 by default.
+# compilers. Contains GCC 13 and Rust 1.70.0 by default.
 #
 # Configurable via build-args:
 #
-# - cxx_package -- additional Ubuntu packages to install. Default: g++-12
+# - cxx_package -- additional Ubuntu packages to install. Default: g++-13
 # - rust_version -- Rust version to install. Default: 1.70.0
 # - cc -- C compiler to use. This gets copied into CC environment variable.
-#       Default: gcc-12
+#       Default: gcc-13
 # - cxx -- C++ compiler to use. This gets copied into CXX environment variable.
-#       Default: g++-12
+#       Default: g++-13
 #
-# Build with defaults:
-#
-#   docker build \
-#       --tag=newsboat-build-tools \
-#       --file=docker/ubuntu_22.04-build-tools.dockerfile \
-#       docker
-#
-# Build with non-default compiler and Rust version:
-#
-#   docker build \
-#       --tag=newsboat-build-tools \
-#       --file=docker/ubuntu_22.04-build-tools.dockerfile \
-#       --build-arg cxx_package=clang-13 \
-#       --build-arg cc=clang-13 \
-#       --build-arg cxx=clang++-13 \
-#       --build-arg rust_version=1.40.0 \
-#       docker
-#
-# Before building in a container, run this to remove any binaries that you
-# might've compiled on your host system (or in another container):
-#
-#   make distclean
-#
-# Run on your local files:
-#
-#   docker run \
-#       --rm \
-#       --mount type=bind,source=$(pwd),target=/home/builder/src \
-#       --user $(id -u):$(id -g) \
-#       newsboat-build-tools \
-#       make
-#
-# To save on bandwidth, and speed up the build slightly, share the host's Cargo
-# cache with the container:
-#
-#   mkdir -p ~/.cargo/registry
-#   docker run \
-#       --mount type=bind,source=$HOME/.cargo/registry,target=/home/builder/.cargo/registry \
-#       ... # the rest of the options
-#
-# If you want to build on the host again, run this to remove binary files
-# compiled in the container:
-#
-#   make distclean
+# For now, this Dockerfile can only be used in our CI.
 
-FROM ubuntu:22.04
+FROM ubuntu:23.04
 
 ENV DEBIAN_FRONTEND noninteractive
 ENV PATH /home/builder/.cargo/bin:$PATH
@@ -64,7 +21,7 @@ RUN apt-get update \
     && apt-get upgrade --assume-yes \
     && apt install --assume-yes --no-install-recommends ca-certificates wget gnupg2
 
-ARG cxx_package=g++-12
+ARG cxx_package=g++-13
 
 RUN apt-get update \
     && apt-get install --assume-yes --no-install-recommends \
@@ -74,8 +31,8 @@ RUN apt-get update \
     && apt-get autoremove \
     && apt-get clean
 
-RUN addgroup --gid 1000 builder \
-    && adduser --home /home/builder --uid 1000 --ingroup builder \
+RUN addgroup builder \
+    && adduser --home /home/builder --ingroup builder \
         --disabled-password --shell /bin/bash builder \
     && mkdir -p /home/builder/src \
     && chown -R builder:builder /home/builder
@@ -103,8 +60,8 @@ RUN wget -O $HOME/rustup.sh --secure-protocol=TLSv1_2 https://sh.rustup.rs \
 
 ENV HOME /home/builder
 
-ARG cc=gcc-12
-ARG cxx=g++-12
+ARG cc=gcc-13
+ARG cxx=g++-13
 
 ENV CC=$cc
 ENV CXX=$cxx
