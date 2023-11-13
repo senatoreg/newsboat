@@ -59,7 +59,7 @@ bool UrlViewFormAction::process_operation(Operation op,
 	case OP_BOOKMARK: {
 		if (!links.empty()) {
 			const unsigned int pos = urls_list.get_position();
-			this->start_bookmark_qna("", links[pos].first, feed->title());
+			this->start_bookmark_qna("", links[pos].url, feed->title());
 		} else {
 			v->get_statusline().show_error(_("No links available!"));
 		}
@@ -80,7 +80,7 @@ bool UrlViewFormAction::process_operation(Operation op,
 		if (idx < links.size()) {
 			const std::string feedurl = (feed != nullptr ?  feed->rssurl() : "");
 			const bool interactive = true;
-			v->open_in_browser(links[idx].first, feedurl, utils::link_type_str(links[idx].second),
+			v->open_in_browser(links[idx].url, feedurl, utils::link_type_str(links[idx].type),
 				feed->title(), interactive);
 		}
 	}
@@ -115,7 +115,7 @@ void UrlViewFormAction::open_current_position_in_browser(bool interactive)
 	if (!links.empty()) {
 		const unsigned int pos = urls_list.get_position();
 		const std::string feedurl = (feed != nullptr ?  feed->rssurl() : "");
-		v->open_in_browser(links[pos].first, feedurl, utils::link_type_str(links[pos].second),
+		v->open_in_browser(links[pos].url, feedurl, utils::link_type_str(links[pos].type),
 			feed->title(), interactive);
 	} else {
 		v->get_statusline().show_error(_("No links available!"));
@@ -127,14 +127,13 @@ void UrlViewFormAction::prepare()
 	if (do_redraw) {
 		update_heading();
 
-		ListFormatter listfmt;
-		unsigned int i = 0;
-		for (const auto& link : links) {
-			listfmt.add_line(utils::quote_for_stfl(strprintf::fmt("%2u  %s", i + 1,
-						link.first)));
-			i++;
-		}
-		urls_list.stfl_replace_lines(listfmt);
+		auto render_line = [this](std::uint32_t line, std::uint32_t width) -> std::string {
+			(void)width;
+			const auto& link = links[line];
+			return utils::quote_for_stfl(strprintf::fmt("%2u  %s", line + 1, link.url));
+		};
+
+		urls_list.invalidate_list_content(links.size(), render_line);
 	}
 }
 

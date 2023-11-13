@@ -11,6 +11,7 @@ src/feedcontainer.cpp
 src/feedhqapi.cpp
 src/feedhqurlreader.cpp
 src/feedlistformaction.cpp
+src/feedretriever.cpp
 src/filebrowserformaction.cpp
 src/file_system.cpp
 src/fileurlreader.cpp
@@ -27,6 +28,7 @@ src/itemlistformaction.cpp
 src/itemrenderer.cpp
 src/itemutils.cpp
 src/itemviewformaction.cpp
+src/links.cpp
 src/listformaction.cpp
 src/listformatter.cpp
 src/listwidgetbackend.cpp

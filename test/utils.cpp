@@ -2,10 +2,14 @@
 
 #include <algorithm>
 #include <chrono>
+#include <condition_variable>
 #include <ctype.h>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <thread>
 #include <tuple>
 #include <unistd.h>
 
@@ -587,6 +591,43 @@ TEST_CASE("run_program()", "[utils]")
 	argv[2] = "hello world";
 	argv[3] = nullptr;
 	REQUIRE(utils::run_program(argv, "") == "hello world");
+}
+
+TEST_CASE("run_program() works for large inputs", "[utils]")
+{
+	const auto large_input = std::make_shared<std::string>(1000000, 'a');
+
+	struct Sync {
+		bool thread_finished = false;
+		std::mutex mtx;
+		std::condition_variable condvar;
+		std::string output;
+	};
+	auto sync = std::make_shared<Sync>();
+
+	std::thread([large_input, sync]() {
+		const char* argv[4];
+		argv[0] = "sh";
+		argv[1] = "-c";
+		argv[2] = "cat";
+		argv[3] = nullptr;
+		sync->output = utils::run_program(argv, *large_input);
+
+		{
+			std::lock_guard<std::mutex> g(sync->mtx);
+			sync->thread_finished = true;
+		}
+		sync->condvar.notify_one();
+	}).detach();
+
+	std::unique_lock<std::mutex> g(sync->mtx);
+	// cat should be able to process 1MB of input in under a second
+	sync->condvar.wait_for(g, std::chrono::seconds(1), [&]() {
+		return sync->thread_finished;
+	});
+
+	REQUIRE(sync->thread_finished);
+	REQUIRE(sync->output == *large_input);
 }
 
 TEST_CASE("run_command() executes the given command with a given argument",

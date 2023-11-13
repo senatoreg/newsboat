@@ -7,6 +7,7 @@
 #include "htmlrenderer.h"
 #include "rssfeed.h"
 #include "textformatter.h"
+#include "utils.h"
 
 namespace newsboat {
 
@@ -46,7 +47,7 @@ std::string item_renderer::get_feedtitle(std::shared_ptr<RssItem> item)
 void prepare_header(
 	std::shared_ptr<RssItem> item,
 	std::vector<std::pair<LineType, std::string>>& lines,
-	std::vector<LinkPair>& /*links*/, bool raw = false)
+	Links& /*links*/, bool raw = false)
 {
 	const auto add_line =
 		[&lines]
@@ -79,7 +80,10 @@ void prepare_header(
 	add_line(item->link(), _("Link: "), LineType::softwrappable);
 	add_line(item->flags(), _("Flags: "));
 
-	if (!item->enclosure_url().empty()) {
+	const bool could_be_podcast = item->enclosure_type().empty()
+		|| utils::is_valid_podcast_type(item->enclosure_type());
+
+	if (!item->enclosure_url().empty() && could_be_podcast) {
 		auto dlurl = strprintf::fmt(
 				"%s%s",
 				_("Podcast Download URL: "),
@@ -96,14 +100,48 @@ void prepare_header(
 	lines.push_back(std::make_pair(LineType::wrappable, std::string("")));
 }
 
-std::string get_item_base_link(const std::shared_ptr<RssItem>& item)
+std::string get_item_base_link(const RssItem& item)
 {
-	if (!item->get_base().empty()) {
-		return item->get_base();
-	} else if (!item->link().empty()) {
-		return item->link();
+	if (!item.get_base().empty()) {
+		return item.get_base();
+	} else if (!item.link().empty()) {
+		return item.link();
 	} else {
-		return item->feedurl();
+		return item.feedurl();
+	}
+}
+
+void prepare_enclosure(RssItem& item,
+	std::vector<std::pair<LineType, std::string>>& lines,
+	Links& links,
+	bool raw)
+{
+	const auto enclosure_url = item.enclosure_url();
+	const auto enclosure_type = item.enclosure_type();
+	const auto enclosure_description = item.enclosure_description();
+
+	if (!enclosure_url.empty()
+		&& !enclosure_type.empty()
+		&& !utils::is_valid_podcast_type(enclosure_type)) {
+		const bool is_image = (enclosure_type.find("image/") == 0);
+		const auto link_type = is_image ? LinkType::IMG : LinkType::HREF;
+		const std::string fallback_description = is_image ? _("Image") : _("Link");
+		const std::string description = (enclosure_description.empty() ? fallback_description :
+				enclosure_description);
+		const auto link = utils::censor_url(
+				utils::absolute_url(get_item_base_link(item), enclosure_url));
+		const auto link_number = links.add_link(link, link_type);
+
+		std::string text = "";
+		if (raw) {
+			text.append(strprintf::fmt("%s", description));
+		} else {
+			text.append(strprintf::fmt("<u>%s</>", utils::quote_for_stfl(description)));
+		}
+		text.append(strprintf::fmt("[%d]", link_number));
+
+		lines.push_back({LineType::wrappable, text});
+		lines.push_back({LineType::wrappable, ""});
 	}
 }
 
@@ -111,7 +149,7 @@ void render_html(
 	ConfigContainer& cfg,
 	const std::string& source,
 	std::vector<std::pair<LineType, std::string>>& lines,
-	std::vector<LinkPair>& thelinks,
+	Links& thelinks,
 	const std::string& url,
 	bool raw)
 {
@@ -174,16 +212,34 @@ void item_renderer::render_plaintext(
 	}
 }
 
+void render_links_summary(std::vector<std::pair<LineType, std::string>>& lines,
+	const Links& links)
+{
+	if (links.size() > 0) {
+		lines.push_back(std::make_pair(LineType::wrappable, ""));
+		lines.push_back(std::make_pair(LineType::wrappable, _("Links: ")));
+		for (unsigned int i = 0; i < links.size(); ++i) {
+			auto link_text = strprintf::fmt("[%u]: %s (%s)",
+					i + 1,
+					links[i].url,
+					Links::type2str(links[i].type));
+			lines.push_back(std::make_pair(LineType::softwrappable, link_text));
+		}
+	}
+}
+
 std::string item_renderer::to_plain_text(
 	ConfigContainer& cfg,
 	std::shared_ptr<RssItem> item)
 {
 	std::vector<std::pair<LineType, std::string>> lines;
-	std::vector<LinkPair> links;
+	Links links;
 	const auto item_description = item->description();
 
 	prepare_header(item, lines, links, true);
-	const auto base = get_item_base_link(item);
+	prepare_enclosure(*item, lines, links, true);
+
+	const auto base = get_item_base_link(*item);
 	const auto body = utils::utf8_to_locale(item_description.text);
 
 	if (should_render_as_html(item_description.mime)) {
@@ -191,6 +247,8 @@ std::string item_renderer::to_plain_text(
 	} else {
 		render_plaintext(body, lines, OutputFormat::PlainText);
 	}
+
+	render_links_summary(lines, links);
 
 	TextFormatter txtfmt;
 	txtfmt.add_lines(lines);
@@ -210,13 +268,15 @@ std::pair<std::string, size_t> item_renderer::to_stfl_list(
 	unsigned int window_width,
 	RegexManager* rxman,
 	const std::string& location,
-	std::vector<LinkPair>& links)
+	Links& links)
 {
 	std::vector<std::pair<LineType, std::string>> lines;
 	const auto item_description = item->description();
 
 	prepare_header(item, lines, links);
-	const std::string baseurl = get_item_base_link(item);
+	prepare_enclosure(*item, lines, links, false);
+
+	const std::string baseurl = get_item_base_link(*item);
 	const auto body = utils::utf8_to_locale(item_description.text);
 
 	if (should_render_as_html(item_description.mime)) {
@@ -224,6 +284,8 @@ std::pair<std::string, size_t> item_renderer::to_stfl_list(
 	} else {
 		render_plaintext(body, lines, OutputFormat::StflRichText);
 	}
+
+	render_links_summary(lines, links);
 
 	TextFormatter txtfmt;
 	txtfmt.add_lines(lines);
@@ -261,7 +323,7 @@ std::pair<std::string, size_t> item_renderer::source_to_stfl_list(
 	const std::string& location)
 {
 	std::vector<std::pair<LineType, std::string>> lines;
-	std::vector<LinkPair> links;
+	Links links;
 
 	prepare_header(item, lines, links);
 	render_source(lines, utils::quote_for_stfl(utils::utf8_to_locale(

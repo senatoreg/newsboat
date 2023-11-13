@@ -1,4 +1,4 @@
-use crate::htmlrenderer;
+use crate::links;
 use crate::logger::{self, Level};
 use libc::{
     c_char, c_int, c_ulong, c_void, close, execvp, exit, fork, size_t, waitpid, E2BIG, EILSEQ,
@@ -26,7 +26,7 @@ pub fn consolidate_whitespace(input: String) -> String {
 
     if let Some(found) = found {
         let (leading, rest) = input.split_at(found);
-        let lastchar = input.chars().rev().next().unwrap();
+        let lastchar = input.chars().next_back().unwrap();
 
         result.push_str(leading);
 
@@ -330,7 +330,7 @@ pub fn remove_soft_hyphens(text: &mut String) {
 ///
 /// 2. figuring out the `LinkType` for a particular enclosure, given its MIME type
 ///    (`utils::podcast_mime_to_link_type`).
-type MimeMatcher = (fn(&str) -> bool, htmlrenderer::LinkType);
+type MimeMatcher = (fn(&str) -> bool, links::LinkType);
 const PODCAST_MIME_TO_LINKTYPE: [MimeMatcher; 2] = [
     (
         |mime| {
@@ -339,12 +339,9 @@ const PODCAST_MIME_TO_LINKTYPE: [MimeMatcher; 2] = [
             // https://tools.ietf.org/html/rfc5334#section-10.1
             mime.starts_with("audio/") || mime == "application/ogg"
         },
-        htmlrenderer::LinkType::Audio,
+        links::LinkType::Audio,
     ),
-    (
-        |mime| mime.starts_with("video/"),
-        htmlrenderer::LinkType::Video,
-    ),
+    (|mime| mime.starts_with("video/"), links::LinkType::Video),
 ];
 
 /// Returns `true` if given MIME type is considered to be a podcast by Newsboat.
@@ -357,7 +354,7 @@ pub fn is_valid_podcast_type(mimetype: &str) -> bool {
 /// Converts podcast's MIME type into an HtmlRenderer's "link type"
 ///
 /// Returns None if given MIME type is not a podcast type. See `is_valid_podcast_type()`.
-pub fn podcast_mime_to_link_type(mime_type: &str) -> Option<htmlrenderer::LinkType> {
+pub fn podcast_mime_to_link_type(mime_type: &str) -> Option<links::LinkType> {
     PODCAST_MIME_TO_LINKTYPE
         .iter()
         .find_map(|(matcher, link_type)| {
@@ -468,7 +465,7 @@ pub fn run_command(cmd: &str, param: &str) {
     }
 }
 
-pub fn run_program(cmd_with_args: &[&str], input: &str) -> String {
+pub fn run_program(cmd_with_args: &[&str], input: String) -> String {
     if cmd_with_args.is_empty() {
         return String::new();
     }
@@ -485,19 +482,21 @@ pub fn run_program(cmd_with_args: &[&str], input: &str) -> String {
                 "utils::run_program: spawning a child for \"{:?}\" \
                  with input \"{}\" failed: {}",
                 cmd_with_args,
-                input,
+                &input,
                 error
             );
         })
         .and_then(|mut child| {
-            if let Some(stdin) = child.stdin.as_mut() {
-                if let Err(error) = stdin.write_all(input.as_bytes()) {
-                    log!(
-                        Level::Debug,
-                        "utils::run_program: failed to write to child's stdin: {}",
-                        error
-                    );
-                }
+            if let Some(mut stdin) = child.stdin.take() {
+                std::thread::spawn(move || {
+                    if let Err(error) = stdin.write_all(input.as_bytes()) {
+                        log!(
+                            Level::Debug,
+                            "utils::run_program: failed to write to child's stdin: {}",
+                            error
+                        );
+                    }
+                });
             }
 
             child
@@ -552,9 +551,16 @@ pub fn make_title(rs_str: String) -> String {
 
     // Un-escape any percent-encoding, e.g. "It%27s%202017%21" -> "It's
     // 2017!"
-    match unescape_url(result) {
+    let result = match unescape_url(result) {
         None => String::new(),
         Some(f) => f,
+    };
+
+    // If it contains only digits, assume it's an id, not a proper title
+    if result.chars().all(|c| c.is_ascii_digit()) {
+        String::new()
+    } else {
+        result
     }
 }
 
@@ -1210,23 +1216,23 @@ mod tests {
     fn t_tokenize_quoted_interprets_double_backslash_as_literal_backslash() {
         assert_eq!(tokenize_quoted(r#""""#, ""), vec![""]);
 
-        assert_eq!(tokenize_quoted(r#""\\""#, ""), vec![r#"\"#]);
+        assert_eq!(tokenize_quoted(r#""\\""#, ""), vec![r"\"]);
 
         assert_eq!(tokenize_quoted(r##""#\\""##, ""), vec!["#\\"]);
 
         assert_eq!(tokenize_quoted(r#""'#\\'""#, ""), vec!["'#\\'"]);
 
-        assert_eq!(tokenize_quoted(r#""'#\\ \\'""#, ""), vec![r#"'#\ \'"#]);
+        assert_eq!(tokenize_quoted(r#""'#\\ \\'""#, ""), vec![r"'#\ \'"]);
 
-        assert_eq!(tokenize_quoted("\"\\\\\\\\", ""), vec![r#"\\"#]);
+        assert_eq!(tokenize_quoted("\"\\\\\\\\", ""), vec![r"\\"]);
 
-        assert_eq!(tokenize_quoted("\"\\\\\\\\\\\\", ""), vec![r#"\\\"#]);
+        assert_eq!(tokenize_quoted("\"\\\\\\\\\\\\", ""), vec![r"\\\"]);
 
-        assert_eq!(tokenize_quoted("\"\\\\\\\\\"", ""), vec![r#"\\"#]);
+        assert_eq!(tokenize_quoted("\"\\\\\\\\\"", ""), vec![r"\\"]);
 
-        assert_eq!(tokenize_quoted("\"\\\\\\\\\\\\\"", ""), vec![r#"\\\"#]);
+        assert_eq!(tokenize_quoted("\"\\\\\\\\\\\\\"", ""), vec![r"\\\"]);
 
-        assert_eq!(tokenize_quoted(r#""\\bgit\\b""#, ""), vec![r#"\bgit\b"#]);
+        assert_eq!(tokenize_quoted(r#""\\bgit\\b""#, ""), vec![r"\bgit\b"]);
 
         assert_eq!(
             tokenize_quoted(
@@ -1235,7 +1241,7 @@ mod tests {
             ),
             vec![
                 "browser",
-                r#"/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --app %u"#
+                r"/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --app %u"
             ]
         );
     }
@@ -1281,7 +1287,7 @@ mod tests {
     #[test]
     fn t_tokenize_quoted_ignores_escaped_pound_sign_start_of_token() {
         assert_eq!(
-            tokenize_quoted(r#"one \# two three # ???"#, " "),
+            tokenize_quoted(r"one \# two three # ???", " "),
             vec!["one", "\\#", "two", "three"]
         );
     }
@@ -1573,7 +1579,7 @@ mod tests {
 
     #[test]
     fn t_podcast_mime_to_link_type() {
-        use crate::htmlrenderer::LinkType::*;
+        use crate::links::LinkType::*;
 
         assert_eq!(podcast_mime_to_link_type("audio/mpeg"), Some(Audio));
         assert_eq!(podcast_mime_to_link_type("audio/mp3"), Some(Audio));
@@ -1701,10 +1707,10 @@ mod tests {
     #[test]
     fn t_run_program() {
         let input1 = "this is a multine-line\ntest string";
-        assert_eq!(run_program(&["cat"], input1), input1);
+        assert_eq!(run_program(&["cat"], input1.to_owned()), input1);
 
         assert_eq!(
-            run_program(&["echo", "-n", "hello world"], ""),
+            run_program(&["echo", "-n", "hello world"], String::new()),
             "hello world"
         );
     }
@@ -1973,12 +1979,12 @@ mod tests {
         assert_eq!(strip_comments(&input), expected);
 
         // Escaped backtick inside backticks is not treated as closing
-        let expected = r#"some `other \` tricky # test` hehe"#;
+        let expected = r"some `other \` tricky # test` hehe";
         let input = expected.to_owned() + "#here goescomment";
         assert_eq!(strip_comments(&input), expected);
 
         // Ignores escaped # characters (\\#)
-        let expected = r#"one two \# three four"#;
+        let expected = r"one two \# three four";
         let input = expected.to_owned() + "# and a comment";
         assert_eq!(strip_comments(&input), expected);
     }

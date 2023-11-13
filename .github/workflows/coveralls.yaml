@@ -50,7 +50,7 @@ jobs:
         with:
           rust-version: nightly
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Cache ~/.cargo
         uses: actions/cache@v3
@@ -64,7 +64,7 @@ jobs:
 
       - name: Install grcov
         if: steps.cargo_cache.outputs.cache-hit != 'true'
-        run: cargo install --locked grcov
+        run: cargo install grcov
 
       - name: Run tests
         run: make --jobs=3 NEWSBOAT_RUN_IGNORED_TESTS=1 ci-check

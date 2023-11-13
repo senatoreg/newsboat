@@ -14,9 +14,8 @@ namespace newsboat {
 
 DialogsFormAction::DialogsFormAction(View* vv,
 	std::string formstr,
-	ConfigContainer* cfg)
-	: FormAction(vv, formstr, cfg)
-	, dialogs_list("dialogs", FormAction::f, cfg->get_configvalue_as_int("scrolloff"))
+	ConfigContainer* cfg, RegexManager& r)
+	: ListFormAction(vv, "dialoglist", formstr, "dialogs", cfg, r)
 {
 }
 
@@ -34,27 +33,20 @@ void DialogsFormAction::prepare()
 	if (do_redraw) {
 		update_heading();
 
-		ListFormatter listfmt;
+		auto render_line = [this](std::uint32_t line, std::uint32_t width) -> std::string {
+			(void)width;
+			const auto formaction_names = v->get_formaction_names();
+			const auto& fa = formaction_names[line];
+			const bool is_current_formaction =
+			v->get_formaction(fa.first) == get_parent_formaction();
+			return utils::quote_for_stfl(
+				strprintf::fmt("%4u %s %s",
+					line + 1,
+					is_current_formaction ? "*" : " ",
+					fa.second));
+		};
 
-		unsigned int i = 1;
-		for (const auto& fa : v->get_formaction_names()) {
-			LOG(Level::DEBUG,
-				"DialogsFormAction::prepare: p1 = %p p2 = %p",
-				v->get_formaction(fa.first).get(),
-				get_parent_formaction().get());
-			listfmt.add_line(
-				utils::quote_for_stfl(
-					strprintf::fmt("%4u %s %s",
-						i,
-						(v->get_formaction(fa.first).get() ==
-							get_parent_formaction().get())
-						? "*"
-						: " ",
-						fa.second)));
-			i++;
-		}
-
-		dialogs_list.stfl_replace_lines(listfmt);
+		list.invalidate_list_content(v->get_formaction_names().size(), render_line);
 
 		do_redraw = false;
 	}
@@ -63,7 +55,7 @@ void DialogsFormAction::prepare()
 void DialogsFormAction::update_heading()
 {
 
-	const unsigned int width = dialogs_list.get_width();
+	const unsigned int width = list.get_width();
 	const std::string title_format = cfg->get_configvalue("dialogs-title-format");
 	FmtStrFormatter fmt;
 	fmt.register_fmt('N', PROGRAM_NAME);
@@ -81,17 +73,17 @@ const std::vector<KeyMapHintEntry>& DialogsFormAction::get_keymap_hint() const
 }
 
 bool DialogsFormAction::process_operation(Operation op,
-	bool /* automatic */,
-	std::vector<std::string>* /* args */)
+	bool automatic,
+	std::vector<std::string>* args)
 {
 	switch (op) {
 	case OP_OPEN: {
-		const unsigned int pos = dialogs_list.get_position();
+		const unsigned int pos = list.get_position();
 		v->set_current_formaction(pos);
 	}
 	break;
 	case OP_CLOSEDIALOG: {
-		const unsigned int pos = dialogs_list.get_position();
+		const unsigned int pos = list.get_position();
 		if (pos != 0) {
 			v->remove_formaction(pos);
 			do_redraw = true;
@@ -102,18 +94,16 @@ bool DialogsFormAction::process_operation(Operation op,
 	}
 	break;
 	case OP_PREV:
-		dialogs_list.move_up(cfg->get_configvalue_as_bool("wrap-scroll"));
+		list.move_up(cfg->get_configvalue_as_bool("wrap-scroll"));
 		break;
 	case OP_NEXT:
-		dialogs_list.move_down(cfg->get_configvalue_as_bool("wrap-scroll"));
+		list.move_down(cfg->get_configvalue_as_bool("wrap-scroll"));
 		break;
 	case OP_QUIT:
 		v->pop_current_formaction();
 		break;
 	default:
-		if (handle_list_operations(dialogs_list, op)) {
-			break;
-		}
+		ListFormAction::process_operation(op, automatic, args);
 		break;
 	}
 	return true;
@@ -129,7 +119,7 @@ void DialogsFormAction::handle_cmdline(const std::string& cmd)
 	unsigned int idx = 0;
 	if (1 == sscanf(cmd.c_str(), "%u", &idx)) {
 		if (idx >= 1 && idx <= v->formaction_stack_size()) {
-			dialogs_list.set_position(idx - 1);
+			list.set_position(idx - 1);
 		} else {
 			v->get_statusline().show_error(_("Invalid position!"));
 		}

@@ -75,11 +75,13 @@ TEST_CASE("opml::generate creates an XML document with feed URLs in OPML format"
 			"<outline type=\"rss\" "
 			"xmlUrl=\"https://example.com/feed1.xml\" "
 			"htmlUrl=\"https://example.com/feed1/\" "
-			"title=\"Feed 1\"/>"
+			"title=\"Feed 1\" "
+			"text=\"Feed 1\"/>"
 			"<outline type=\"rss\" "
 			"xmlUrl=\"https://example.com/feed2.xml\" "
 			"htmlUrl=\"https://example.com/feed2/\" "
-			"title=\"Feed 2\"/>"
+			"title=\"Feed 2\" "
+			"text=\"Feed 2\"/>"
 			"</body>"
 			"</opml>\n");
 
@@ -92,11 +94,13 @@ TEST_CASE("opml::generate creates an XML document with feed URLs in OPML format"
 			"xmlUrl=\"https://example.com/feed1.xml\" "
 			"htmlUrl=\"https://example.com/feed1/\" "
 			"title=\"Feed 1\" "
+			"text=\"Feed 1\" "
 			"category=\"\"/>"
 			"<outline type=\"rss\" "
 			"xmlUrl=\"https://example.com/feed2.xml\" "
 			"htmlUrl=\"https://example.com/feed2/\" "
 			"title=\"Feed 2\" "
+			"text=\"Feed 2\" "
 			"category=\"tag,tag_with_commas,tag/with/slashes,tag with spaces\"/>"
 			"</body>"
 			"</opml>\n");
@@ -294,6 +298,18 @@ TEST_CASE("import() skips URLs that are already present in UrlReader",
 	}
 }
 
+TEST_CASE("import() tags from category attribute", "[Opml]")
+{
+	FileUrlReader urlcfg;
+	REQUIRE_NOTHROW(
+		opml::import("file://" + utils::getcwd() + "/data/category.opml", urlcfg)
+	);
+
+	const std::vector<std::string> tags{"tag one", "tag_two", "tag/three"};
+	const auto& urls = urlcfg.get_urls();
+	REQUIRE(urls.size() == 1);
+	REQUIRE(urlcfg.get_tags(urls[0]) == tags);
+}
 // falls back to "url" if "xmlUrl" is absent
 
 // skips an entry if xmlUrl/url is absent
