@@ -9,6 +9,8 @@
 #include <string>
 #include <sys/stat.h>
 
+#include "3rd-party/optional.hpp"
+
 #include "config.h"
 #include "controller.h"
 #include "dbexception.h"
@@ -50,8 +52,8 @@ ItemListFormAction::ItemListFormAction(View* vv,
 ItemListFormAction::~ItemListFormAction() {}
 
 bool ItemListFormAction::process_operation(Operation op,
-	bool automatic,
-	std::vector<std::string>* args)
+	const std::vector<std::string>& args,
+	BindingType bindingType)
 {
 	bool quit = false;
 	bool hardquit = false;
@@ -146,7 +148,8 @@ bool ItemListFormAction::process_operation(Operation op,
 		item->set_unread(false);
 		v->get_ctrl()->mark_article_read(item->guid(), true);
 		if (cfg->get_configvalue_as_bool("openbrowser-and-mark-jumps-to-next-unread")) {
-			process_operation(OP_NEXTUNREAD);
+			std::vector<std::string> args;
+			process_operation(OP_NEXTUNREAD, args);
 		} else {
 			if (itempos < visible_items.size() - 1) {
 				list.set_position(itempos + 1);
@@ -219,8 +222,8 @@ bool ItemListFormAction::process_operation(Operation op,
 			try {
 				const auto message_lifetime = v->get_statusline().show_message_until_finished(
 						_("Toggling read flag for article..."));
-				if (automatic && args->size() > 0) {
-					if ((*args)[0] == "read") {
+				if (args.size() > 0) {
+					if (args.front() == "read") {
 						visible_items[itempos]
 						.first->set_unread(
 							false);
@@ -228,7 +231,7 @@ bool ItemListFormAction::process_operation(Operation op,
 							visible_items[itempos]
 							.first->guid(),
 							true);
-					} else if ((*args)[0] == "unread") {
+					} else if (args.front() == "unread") {
 						visible_items[itempos]
 						.first->set_unread(
 							true);
@@ -266,7 +269,8 @@ bool ItemListFormAction::process_operation(Operation op,
 					list.set_position(itempos + 1);
 				}
 			} else {
-				process_operation(OP_NEXTUNREAD);
+				std::vector<std::string> args;
+				process_operation(OP_NEXTUNREAD, args);
 			}
 			invalidate(itempos);
 		}
@@ -318,23 +322,42 @@ bool ItemListFormAction::process_operation(Operation op,
 		LOG(Level::INFO, "ItemListFormAction: bookmarking item at pos `%u'", itempos);
 		if (!visible_items.empty()) {
 			if (itempos < visible_items.size()) {
-				if (automatic) {
+				switch (bindingType) {
+				case BindingType::Bind:
+					if (args.empty()) {
+						this->start_bookmark_qna(
+							visible_items[itempos].first->title(),
+							visible_items[itempos].first->link(),
+							feed->title());
+					} else {
+						qna_responses = {
+							visible_items[itempos].first->link(),
+							utils::utf8_to_locale(visible_items[itempos].first->title()),
+							args.front(),
+							feed->title(),
+						};
+						this->finished_qna(OP_INT_BM_END);
+					}
+					break;
+				case BindingType::Macro:
 					qna_responses.clear();
 					qna_responses.push_back(
 						visible_items[itempos]
 						.first->link());
 					qna_responses.push_back(utils::utf8_to_locale(
 							visible_items[itempos].first->title()));
-					qna_responses.push_back(args->size() > 0
-						? (*args)[0]
+					qna_responses.push_back(args.size() > 0
+						? args.front()
 						: "");
 					qna_responses.push_back(feed->title());
 					this->finished_qna(OP_INT_BM_END);
-				} else {
+					break;
+				case BindingType::BindKey:
 					this->start_bookmark_qna(
 						visible_items[itempos].first->title(),
 						visible_items[itempos].first->link(),
 						feed->title());
+					break;
 				}
 			}
 		} else {
@@ -346,21 +369,33 @@ bool ItemListFormAction::process_operation(Operation op,
 	case OP_EDITFLAGS: {
 		if (!visible_items.empty()) {
 			if (itempos < visible_items.size()) {
-				if (automatic) {
-					if (args->size() > 0) {
+				switch (bindingType) {
+				case BindingType::Bind:
+					if (args.empty()) {
+						std::vector<QnaPair> qna {
+							QnaPair(_("Flags: "), visible_items[itempos].first->flags())
+						};
+						this->start_qna(qna, OP_INT_EDITFLAGS_END);
+					} else {
+						qna_responses = {args.front()};
+						finished_qna(OP_INT_EDITFLAGS_END);
+					}
+					break;
+				case BindingType::Macro:
+					if (args.size() > 0) {
 						qna_responses.clear();
 						qna_responses.push_back(
-							(*args)[0]);
+							args.front());
 						finished_qna(
 							OP_INT_EDITFLAGS_END);
 					}
-				} else {
+					break;
+				case BindingType::BindKey:
 					std::vector<QnaPair> qna;
 					qna.push_back(QnaPair(_("Flags: "),
-							visible_items[itempos]
-							.first->flags()));
-					this->start_qna(
-						qna, OP_INT_EDITFLAGS_END);
+							visible_items[itempos].first->flags()));
+					this->start_qna(qna, OP_INT_EDITFLAGS_END);
+					break;
 				}
 			}
 		} else {
@@ -373,15 +408,27 @@ bool ItemListFormAction::process_operation(Operation op,
 		LOG(Level::INFO, "ItemListFormAction: saving item at pos `%u'", itempos);
 		if (!visible_items.empty()) {
 			std::shared_ptr<RssItem> item = visible_items[itempos].first;
-			std::string filename;
-			if (automatic) {
-				if (args->size() > 0) {
-					filename = (*args)[0];
+			nonstd::optional<std::string> filename;
+			switch (bindingType) {
+			case BindingType::Bind:
+				if (args.empty()) {
+					const auto title = utils::utf8_to_locale(item->title());
+					const auto suggestion = v->get_filename_suggestion(title);
+					filename = v->run_filebrowser(suggestion);
+				} else {
+					filename = args.front();
 				}
-			} else {
+				break;
+			case BindingType::Macro:
+				if (args.size() > 0) {
+					filename = args.front();
+				}
+				break;
+			case BindingType::BindKey:
 				const auto title = utils::utf8_to_locale(item->title());
 				const auto suggestion = v->get_filename_suggestion(title);
 				filename = v->run_filebrowser(suggestion);
+				break;
 			}
 			save_article(filename, item);
 		} else {
@@ -507,7 +554,8 @@ bool ItemListFormAction::process_operation(Operation op,
 					}
 				}
 				if (cfg->get_configvalue_as_bool("markfeedread-jumps-to-next-unread")) {
-					process_operation(OP_NEXTUNREAD);
+					std::vector<std::string> args;
+					process_operation(OP_NEXTUNREAD, args);
 				} else { // reposition to first/last item
 					std::string sortorder =
 						cfg->get_configvalue("article-sort-order");
@@ -570,17 +618,29 @@ bool ItemListFormAction::process_operation(Operation op,
 	case OP_PIPE_TO:
 		if (visible_items.size() != 0) {
 			std::vector<QnaPair> qna;
-			if (automatic) {
-				if (args->size() > 0) {
-					qna_responses.clear();
-					qna_responses.push_back((*args)[0]);
+			switch (bindingType) {
+			case BindingType::Bind:
+				if (args.empty()) {
+					qna.push_back(QnaPair(_("Pipe article to command: "), ""));
+					this->start_qna(qna, OP_PIPE_TO, &cmdlinehistory);
+				} else {
+					qna_responses = { args.front() };
 					finished_qna(OP_PIPE_TO);
 				}
-			} else {
+				break;
+			case BindingType::Macro:
+				if (args.size() > 0) {
+					qna_responses.clear();
+					qna_responses.push_back(args.front());
+					finished_qna(OP_PIPE_TO);
+				}
+				break;
+			case BindingType::BindKey:
 				qna.push_back(QnaPair(
 						_("Pipe article to command: "), ""));
 				this->start_qna(
 					qna, OP_PIPE_TO, &cmdlinehistory);
+				break;
 			}
 		} else {
 			v->get_statusline().show_error(_("No item selected!"));
@@ -588,29 +648,55 @@ bool ItemListFormAction::process_operation(Operation op,
 		break;
 	case OP_SEARCH: {
 		std::vector<QnaPair> qna;
-		if (automatic) {
-			if (args->size() > 0) {
-				qna_responses.clear();
-				qna_responses.push_back((*args)[0]);
+		switch (bindingType) {
+		case BindingType::Bind:
+			if (args.empty()) {
+				qna.push_back(QnaPair(_("Search for: "), ""));
+				this->start_qna(qna, OP_INT_START_SEARCH, &searchhistory);
+			} else {
+				qna_responses = { args.front() };
 				finished_qna(OP_INT_START_SEARCH);
 			}
-		} else {
+			break;
+		case BindingType::Macro:
+			if (args.size() > 0) {
+				qna_responses.clear();
+				qna_responses.push_back(args.front());
+				finished_qna(OP_INT_START_SEARCH);
+			}
+			break;
+		case BindingType::BindKey:
 			qna.push_back(QnaPair(_("Search for: "), ""));
 			this->start_qna(
 				qna, OP_INT_START_SEARCH, &searchhistory);
+			break;
 		}
 	}
 	break;
 	case OP_GOTO_TITLE:
-		if (automatic) {
-			if (args->size() >= 1) {
+		switch (bindingType) {
+		case BindingType::Bind:
+			if (args.empty()) {
+				std::vector<QnaPair> qna {
+					QnaPair(_("Title: "), ""),
+				};
+				this->start_qna(qna, OP_INT_GOTO_TITLE);
+			} else {
 				qna_responses = {args[0]};
 				finished_qna(OP_INT_GOTO_TITLE);
 			}
-		} else {
+			break;
+		case BindingType::Macro:
+			if (args.size() >= 1) {
+				qna_responses = {args[0]};
+				finished_qna(OP_INT_GOTO_TITLE);
+			}
+			break;
+		case BindingType::BindKey:
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Title: "), ""));
 			this->start_qna(qna, OP_INT_GOTO_TITLE);
+			break;
 		}
 		break;
 	case OP_EDIT_URLS:
@@ -619,8 +705,8 @@ bool ItemListFormAction::process_operation(Operation op,
 	case OP_SELECTFILTER:
 		if (filter_container.size() > 0) {
 			std::string newfilter;
-			if (automatic && args->size() > 0) {
-				const std::string filter_name = (*args)[0];
+			if (args.size() > 0) {
+				const std::string filter_name = args.front();
 				const auto filter = filter_container.get_filter(filter_name);
 
 				if (filter.has_value()) {
@@ -639,17 +725,31 @@ bool ItemListFormAction::process_operation(Operation op,
 
 		break;
 	case OP_SETFILTER:
-		if (automatic) {
-			if (args->size() > 0) {
-				qna_responses.clear();
-				qna_responses.push_back((*args)[0]);
+		switch (bindingType) {
+		case BindingType::Bind:
+			if (args.empty()) {
+				std::vector<QnaPair> qna {
+					QnaPair(_("Filter: "), ""),
+				};
+				this->start_qna(qna, OP_INT_END_SETFILTER, &filterhistory);
+			} else {
+				qna_responses = { args.front() };
 				this->finished_qna(OP_INT_END_SETFILTER);
 			}
-		} else {
+			break;
+		case BindingType::Macro:
+			if (args.size() > 0) {
+				qna_responses.clear();
+				qna_responses.push_back(args.front());
+				this->finished_qna(OP_INT_END_SETFILTER);
+			}
+			break;
+		case BindingType::BindKey:
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Filter: "), ""));
 			this->start_qna(
 				qna, OP_INT_END_SETFILTER, &filterhistory);
+			break;
 		}
 		break;
 	case OP_CLEARFILTER:
@@ -762,7 +862,7 @@ bool ItemListFormAction::process_operation(Operation op,
 	}
 	break;
 	default:
-		ListFormAction::process_operation(op, automatic, args);
+		ListFormAction::process_operation(op, args, bindingType);
 		break;
 	}
 	if (hardquit) {
@@ -1370,20 +1470,20 @@ void ItemListFormAction::restore_selected_position()
 
 }
 
-void ItemListFormAction::save_article(const std::string& filename,
+void ItemListFormAction::save_article(const nonstd::optional<std::string>& filename,
 	std::shared_ptr<RssItem> item)
 {
-	if (filename == "") {
+	if (!filename.has_value()) {
 		v->get_statusline().show_error(_("Aborted saving."));
 	} else {
 		try {
-			v->get_ctrl()->write_item(item, filename);
+			v->get_ctrl()->write_item(item, filename.value());
 			v->get_statusline().show_message(strprintf::fmt(
-					_("Saved article to %s"), filename));
+					_("Saved article to %s"), filename.value()));
 		} catch (...) {
 			v->get_statusline().show_error(strprintf::fmt(
 					_("Error: couldn't save article to %s"),
-					filename));
+					filename.value()));
 		}
 	}
 }
@@ -1496,14 +1596,14 @@ void ItemListFormAction::handle_op_saveall()
 		return;
 	}
 
-	std::string directory = v->run_dirbrowser();
+	nonstd::optional<std::string> directory = v->run_dirbrowser();
 
-	if (directory.empty()) {
+	if (!directory.has_value()) {
 		return;
 	}
 
-	if (directory.back() != NEWSBEUTER_PATH_SEP) {
-		directory.push_back(NEWSBEUTER_PATH_SEP);
+	if (directory.value().back() != NEWSBEUTER_PATH_SEP) {
+		directory.value().push_back(NEWSBEUTER_PATH_SEP);
 	}
 
 	std::vector<std::string> filenames;
@@ -1518,7 +1618,7 @@ void ItemListFormAction::handle_op_saveall()
 
 	int nfiles_exist = filenames.size() - unique_filenames.size();
 	for (const auto& filename : unique_filenames) {
-		const auto filepath = directory + filename;
+		const auto filepath = directory.value() + filename;
 		struct stat sbuf;
 		if (::stat(filepath.c_str(), &sbuf) != -1) {
 			nfiles_exist++;
@@ -1539,7 +1639,7 @@ void ItemListFormAction::handle_op_saveall()
 	bool overwrite_all = false;
 	for (size_t item_idx = 0; item_idx < filenames.size(); ++item_idx) {
 		const auto filename = filenames[item_idx];
-		const auto filepath = directory + filename;
+		const auto filepath = directory.value() + filename;
 		auto item = visible_items[item_idx].first;
 
 		struct stat sbuf;
@@ -1555,13 +1655,13 @@ void ItemListFormAction::handle_op_saveall()
 							_("Overwrite `%s' in `%s'? "
 								"There are %d more conflicts like this "
 								"(y:Yes a:Yes to all n:No q:No to all)"),
-							filename, directory, --nfiles_exist),
+							filename, directory.value(), --nfiles_exist),
 						input_options);
 			} else {
 				c = v->confirm(strprintf::fmt(
 							_("Overwrite `%s' in `%s'? "
 								"(y:Yes n:No)"),
-							filename, directory),
+							filename, directory.value()),
 						input_options);
 			}
 			if (!c) {

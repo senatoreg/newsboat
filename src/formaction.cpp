@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "matcherexception.h"
 #include "strprintf.h"
+#include "textviewwidget.h"
 #include "utils.h"
 #include "view.h"
 
@@ -98,8 +99,8 @@ void FormAction::start_cmdline(std::string default_value)
 }
 
 bool FormAction::process_op(Operation op,
-	bool automatic,
-	std::vector<std::string>* args)
+	const std::vector<std::string>& args,
+	BindingType bindingType)
 {
 	switch (op) {
 	case OP_REDRAW:
@@ -110,25 +111,27 @@ bool FormAction::process_op(Operation op,
 		start_cmdline();
 		break;
 	case OP_INT_SET:
-		if (automatic) {
-			if (args && args->size() == 2) {
-				const std::string key = args->at(0);
-				const std::string value = args->at(1);
+		switch (bindingType) {
+		case BindingType::Bind:
+		case BindingType::Macro:
+			if (args.size() == 2) {
+				const std::string key = args.at(0);
+				const std::string value = args.at(1);
 				cfg->set_configvalue(key, value);
 				set_redraw(true);
 				return true;
 			}
-			if (args && args->size() == 1) {
-				if (handle_single_argument_set(args->at(0))) {
+			if (args.size() == 1) {
+				if (handle_single_argument_set(args.at(0))) {
 					return true;
 				}
 			}
 			v->get_statusline().show_error(_("usage: set <config-option> <value>"));
 			return false;
-		} else {
+		case BindingType::BindKey:
 			LOG(Level::WARN,
-				"FormAction::process_op: got OP_INT_SET, but "
-				"not automatic");
+				"FormAction::process_op: got OP_INT_SET, but from a bind-key which does not support arguments");
+			break;
 		}
 		break;
 	case OP_VIEWDIALOGS:
@@ -141,7 +144,7 @@ bool FormAction::process_op(Operation op,
 		v->goto_prev_dialog();
 		break;
 	default:
-		return this->process_operation(op, automatic, args);
+		return this->process_operation(op, args, bindingType);
 	}
 	return true;
 }
@@ -300,7 +303,8 @@ void FormAction::handle_exec(const std::vector<std::string>& args)
 	} else {
 		const auto op = v->get_keymap()->get_opcode(args[0]);
 		if (op != OP_NIL) {
-			process_op(op);
+			std::vector<std::string> args;
+			process_op(op, args);
 		} else {
 			v->get_statusline().show_error(_("Operation not found"));
 		}
@@ -366,6 +370,39 @@ bool FormAction::handle_list_operations(ListWidget& list, Operation op)
 		return false;
 	}
 	return false;
+}
+
+bool FormAction::handle_textview_operations(TextviewWidget& textview, Operation op)
+{
+	switch (op) {
+	case OP_SK_UP:
+		textview.scroll_up();
+		break;
+	case OP_SK_DOWN:
+		textview.scroll_down();
+		break;
+	case OP_SK_HOME:
+		textview.scroll_to_top();
+		break;
+	case OP_SK_END:
+		textview.scroll_to_bottom();
+		break;
+	case OP_SK_PGUP:
+		textview.scroll_page_up();
+		break;
+	case OP_SK_PGDOWN:
+		textview.scroll_page_down();
+		break;
+	case OP_SK_HALF_PAGE_UP:
+		textview.scroll_halfpage_up();
+		break;
+	case OP_SK_HALF_PAGE_DOWN:
+		textview.scroll_halfpage_down();
+		break;
+	default:
+		return false;
+	}
+	return true;
 }
 
 bool FormAction::handle_single_argument_set(std::string argument)

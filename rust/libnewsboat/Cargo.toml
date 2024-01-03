@@ -1,6 +1,6 @@
 [package]
 name = "libnewsboat"
-version = "2.33.0"
+version = "2.34.0"
 authors = ["Alexander Batischev <eual.jp@gmail.com>"]
 edition = "2018"
 
@@ -9,9 +9,8 @@ strprintf = { path="../strprintf" }
 regex-rs = { path="../regex-rs" }
 
 fastrand = "2.0.0"
-once_cell = "1.18.0"
-url = "2.4.1"
-percent-encoding = "2.3.0"
+url = "2.5.0"
+percent-encoding = "2.3.1"
 xdg = "2.5.2"
 backtrace = "= 0.3"
 unicode-width = "0.1.11"
@@ -29,7 +28,7 @@ version = "0.7.0"
 features = [ "gettext-system" ]
 
 [dependencies.curl-sys]
-version = "0.4.66"
+version = "0.4.70"
 # This disables the only default feature, "ssl". It doesn't affect the
 # functionality, since it can't affect the libcurl.so available on the host.
 #

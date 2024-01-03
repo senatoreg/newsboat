@@ -86,28 +86,25 @@ void FeedListFormAction::prepare()
 }
 
 bool FeedListFormAction::process_operation(Operation op,
-	bool automatic,
-	std::vector<std::string>* args)
+	const std::vector<std::string>& args,
+	BindingType bindingType)
 {
 	unsigned int pos = 0;
 	if (visible_feeds.size() >= 1) {
 		const auto selected_pos = list.get_position();
 		pos = visible_feeds[selected_pos].second;
 	}
-	const std::string feedpos = std::to_string(pos);
 	bool quit = false;
 REDO:
 	switch (op) {
 	case OP_OPEN: {
 		if (f.get_focus() == "feeds") {
-			if (automatic && args->size() > 0) {
-				pos = utils::to_u((*args)[0]);
+			if (args.size() > 0) {
+				pos = utils::to_u(args.front());
 			}
 			LOG(Level::INFO,
-				"FeedListFormAction: opening feed at position "
-				"`%s'",
-				feedpos);
-			if (visible_feeds.size() > 0 && feedpos.length() > 0) {
+				"FeedListFormAction: opening feed at position `%d'", pos);
+			if (visible_feeds.size() > 0) {
 				v->push_itemlist(pos);
 			} else {
 				// should not happen
@@ -118,9 +115,8 @@ REDO:
 	break;
 	case OP_RELOAD: {
 		LOG(Level::INFO,
-			"FeedListFormAction: reloading feed at position `%s'",
-			feedpos);
-		if (visible_feeds.size() > 0 && feedpos.length() > 0) {
+			"FeedListFormAction: reloading feed at position `%d'", pos);
+		if (visible_feeds.size() > 0) {
 			v->get_ctrl()->get_reloader()->reload(pos);
 		} else {
 			v->get_statusline().show_error(
@@ -222,15 +218,13 @@ REDO:
 		return open_position_in_browser(pos, interactive);
 	}
 	case OP_OPENALLUNREADINBROWSER:
-		if (visible_feeds.size() > 0 && feedpos.length() > 0) {
+		if (visible_feeds.size() > 0) {
 			std::shared_ptr<RssFeed> feed =
 				v->get_ctrl()->get_feedcontainer()->get_feed(pos);
 			if (feed) {
 				LOG(Level::INFO,
-					"FeedListFormAction: opening all "
-					"unread "
-					"items in feed at position `%s'",
-					feedpos.c_str());
+					"FeedListFormAction: opening all unread items in feed at position `%d'",
+					pos);
 
 				// We can't just `const auto exit_code = ...` here because this
 				// triggers -Wmaybe-initialized in GCC 9 with -O2.
@@ -251,16 +245,13 @@ REDO:
 		}
 		break;
 	case OP_OPENALLUNREADINBROWSER_AND_MARK:
-		if (visible_feeds.size() > 0 && feedpos.length() > 0) {
+		if (visible_feeds.size() > 0) {
 			std::shared_ptr<RssFeed> feed =
 				v->get_ctrl()->get_feedcontainer()->get_feed(pos);
 			if (feed) {
 				LOG(Level::INFO,
-					"FeedListFormAction: opening all "
-					"unread "
-					"items in feed at position `%s' and "
-					"marking read",
-					feedpos.c_str());
+					"FeedListFormAction: opening all unread items in feed at position `%d' and marking read",
+					pos);
 
 				// We can't just `const auto exit_code = ...` here because this
 				// triggers -Wmaybe-initialized in GCC 9 with -O2.
@@ -305,11 +296,8 @@ REDO:
 				"confirm-mark-feed-read") ||
 			v->confirm(_("Do you really want to mark this feed as read (y:Yes n:No)? "),
 				_("yn")) == *_("y")) {
-			LOG(Level::INFO,
-				"FeedListFormAction: marking feed read at position "
-				"`%s'",
-				feedpos);
-			if (visible_feeds.size() > 0 && feedpos.length() > 0) {
+			LOG(Level::INFO, "FeedListFormAction: marking feed read at position `%d'", pos);
+			if (visible_feeds.size() > 0) {
 				try {
 					{
 						const auto message_lifetime = v->get_statusline().show_message_until_finished(
@@ -417,8 +405,8 @@ REDO:
 		break;
 	case OP_SETTAG: {
 		std::string newtag;
-		if (automatic && args->size() > 0) {
-			newtag = (*args)[0];
+		if (args.size() > 0) {
+			newtag = args.front();
 		} else {
 			newtag = v->select_tag(tag);
 		}
@@ -431,8 +419,8 @@ REDO:
 	break;
 	case OP_SELECTFILTER:
 		if (filter_container.size() > 0) {
-			if (automatic && args->size() > 0) {
-				const std::string filter_name = (*args)[0];
+			if (args.size() > 0) {
+				const std::string filter_name = args.front();
 				const auto filter = filter_container.get_filter(filter_name);
 
 				if (filter.has_value()) {
@@ -450,13 +438,13 @@ REDO:
 		}
 		break;
 	case OP_SEARCH:
-		if (automatic && args->size() > 0) {
+		if (args.size() > 0) {
 			qna_responses.clear();
-			// when in automatic mode, we manually fill the
+			// If arguments are specified, we manually fill the
 			// qna_responses vector from the arguments and then run
 			// the finished_qna() by ourselves to simulate a "Q&A"
 			// session that is in fact macro-driven.
-			qna_responses.push_back((*args)[0]);
+			qna_responses.push_back(args.front());
 			finished_qna(OP_INT_START_SEARCH);
 		} else {
 			std::vector<QnaPair> qna;
@@ -466,15 +454,29 @@ REDO:
 		}
 		break;
 	case OP_GOTO_TITLE:
-		if (automatic) {
-			if (args->size() >= 1) {
+		switch (bindingType) {
+		case BindingType::Bind:
+			if (args.empty()) {
+				std::vector<QnaPair> qna {
+					QnaPair(_("Title: "), "")
+				};
+				this->start_qna(qna, OP_INT_GOTO_TITLE);
+			} else {
 				qna_responses = {args[0]};
 				finished_qna(OP_INT_GOTO_TITLE);
 			}
-		} else {
+			break;
+		case BindingType::Macro:
+			if (args.size() >= 1) {
+				qna_responses = {args[0]};
+				finished_qna(OP_INT_GOTO_TITLE);
+			}
+			break;
+		case BindingType::BindKey:
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Title: "), ""));
 			this->start_qna(qna, OP_INT_GOTO_TITLE);
+			break;
 		}
 		break;
 	case OP_CLEARFILTER:
@@ -483,9 +485,9 @@ REDO:
 		save_filterpos();
 		break;
 	case OP_SETFILTER:
-		if (automatic && args->size() > 0) {
+		if (args.size() > 0) {
 			qna_responses.clear();
-			qna_responses.push_back((*args)[0]);
+			qna_responses.push_back(args.front());
 			finished_qna(OP_INT_END_SETFILTER);
 		} else {
 			std::vector<QnaPair> qna;
@@ -503,7 +505,7 @@ REDO:
 			goto REDO;
 		}
 		LOG(Level::INFO, "FeedListFormAction: quitting");
-		if (automatic ||
+		if (bindingType == BindingType::Macro ||
 			!cfg->get_configvalue_as_bool("confirm-exit") ||
 			v->confirm(
 				_("Do you really want to quit (y:Yes n:No)? "),
@@ -519,7 +521,7 @@ REDO:
 		v->push_help();
 		break;
 	default:
-		ListFormAction::process_operation(op, automatic, args);
+		ListFormAction::process_operation(op, args, bindingType);
 		break;
 	}
 	if (quit) {

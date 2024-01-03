@@ -14,6 +14,7 @@ namespace newsboat {
 
 class ConfigContainer;
 class RssFeed;
+class TextviewWidget;
 class View;
 
 typedef std::pair<std::string, std::string> QnaPair;
@@ -29,6 +30,12 @@ enum class CommandType {
 	EXEC,
 	UNKNOWN,	/// Unknown/non-existing command. Tokenized input is stored in Command.args
 	INVALID, 	/// differs from UNKNOWN in that no input was parsed
+};
+
+enum class BindingType {
+	BindKey,
+	Macro,
+	Bind,
 };
 
 struct Command {
@@ -61,8 +68,8 @@ public:
 	virtual void handle_cmdline(const std::string& cmd);
 
 	bool process_op(Operation op,
-		bool automatic = false,
-		std::vector<std::string>* args = nullptr);
+		const std::vector<std::string>& args,
+		BindingType bindingType = BindingType::BindKey);
 
 	virtual void finished_qna(Operation op);
 
@@ -103,8 +110,8 @@ public:
 
 protected:
 	virtual bool process_operation(Operation op,
-		bool automatic = false,
-		std::vector<std::string>* args = nullptr) = 0;
+		const std::vector<std::string>& args,
+		BindingType bindingType = BindingType::BindKey) = 0;
 	virtual void set_keymap_hints();
 
 	/// The name of the "main" STFL widget, i.e. the one that should be focused
@@ -121,6 +128,7 @@ protected:
 	void handle_parsed_command(const Command& command);
 
 	bool handle_list_operations(ListWidget& list, Operation op);
+	bool handle_textview_operations(TextviewWidget& textview, Operation op);
 
 	View* v;
 	ConfigContainer* cfg;
