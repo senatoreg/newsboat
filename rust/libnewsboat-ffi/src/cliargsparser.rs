@@ -49,20 +49,14 @@ mod bridged {
         fn lock_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
         fn cache_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
         fn config_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
+        fn queue_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
+        fn search_history_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
+        fn cmdline_history_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
         fn log_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool;
 
         fn cmds_to_execute(cliargsparser: &CliArgsParser) -> Vec<String>;
 
         fn log_level(cliargsparser: &CliArgsParser, level: &mut i8) -> bool;
-    }
-
-    extern "C++" {
-        // cxx uses `std::out_of_range`, but doesn't include the header that defines that
-        // exception. So we do it for them.
-        include!("stdexcept");
-        // Also inject a header that defines ptrdiff_t. Note this is *not* a C++ header, because
-        // cxx uses a non-C++ name of the type.
-        include!("stddef.h");
     }
 }
 
@@ -193,6 +187,36 @@ fn cache_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool {
 
 fn config_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool {
     match &cliargsparser.0.config_file {
+        Some(p) => {
+            *path = p.to_string_lossy().to_string();
+            true
+        }
+        None => false,
+    }
+}
+
+fn queue_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool {
+    match &cliargsparser.0.queue_file {
+        Some(p) => {
+            *path = p.to_string_lossy().to_string();
+            true
+        }
+        None => false,
+    }
+}
+
+fn search_history_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool {
+    match &cliargsparser.0.search_history_file {
+        Some(p) => {
+            *path = p.to_string_lossy().to_string();
+            true
+        }
+        None => false,
+    }
+}
+
+fn cmdline_history_file(cliargsparser: &CliArgsParser, path: &mut String) -> bool {
+    match &cliargsparser.0.cmdline_history_file {
         Some(p) => {
             *path = p.to_string_lossy().to_string();
             true

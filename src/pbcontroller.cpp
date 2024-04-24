@@ -11,9 +11,11 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <memory>
 #include <thread>
 #include <unistd.h>
 
+#include "3rd-party/optional.hpp"
 #include "config.h"
 #include "configcontainer.h"
 #include "configexception.h"
@@ -182,6 +184,7 @@ void PbController::initialize(int argc, char* argv[])
 	static const struct option longopts[] = {
 		{"config-file", required_argument, 0, 'C'},
 		{"queue-file", required_argument, 0, 'q'},
+		{"lock-file", required_argument, 0, 256},
 		{"log-file", required_argument, 0, 'd'},
 		{"log-level", required_argument, 0, 'l'},
 		{"help", no_argument, 0, 'h'},
@@ -189,6 +192,8 @@ void PbController::initialize(int argc, char* argv[])
 		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
+	nonstd::optional<Level> log_level;
+	nonstd::optional<std::string> log_file;
 
 	while ((c = ::getopt_long(argc, argv, getopt_str, longopts, nullptr)) !=
 		-1) {
@@ -203,21 +208,22 @@ void PbController::initialize(int argc, char* argv[])
 		case 'q':
 			queue_file = optarg;
 			break;
+		case 256:
+			lock_file = optarg;
+			break;
 		case 'a':
 			automatic_dl = true;
 			break;
 		case 'd':
-			logger::set_logfile(optarg);
+			log_file = optarg;
 			break;
 		case 'l': {
-			Level l = static_cast<Level>(atoi(optarg));
-			if (l >= Level::USERERROR && l <= Level::DEBUG) {
-				logger::set_loglevel(l);
-			} else {
+			log_level = static_cast<Level>(atoi(optarg));
+			if (log_level < Level::USERERROR || log_level > Level::DEBUG) {
 				std::cerr << strprintf::fmt(_("%s: %d: invalid "
 							"loglevel value"),
 						argv[0],
-						static_cast<int>(l))
+						static_cast<int>(log_level.value()))
 					<< std::endl;
 				exit(EXIT_FAILURE);
 			}
@@ -229,11 +235,26 @@ void PbController::initialize(int argc, char* argv[])
 		}
 	};
 
+	if (log_level.has_value()) {
+		logger::set_loglevel(log_level.value());
+	}
+
+	if (log_file.has_value()) {
+		logger::set_logfile(log_file.value());
+	}
+
+	if (!log_file.has_value() && log_level.has_value()) {
+		const std::string date_time_string = utils::mt_strf_localtime("%Y-%m-%d_%H.%M.%S",
+				std::time(nullptr));
+		const std::string filename = "podboat_" + date_time_string + ".log";
+		logger::set_logfile(filename);
+	}
+
 	std::cout << strprintf::fmt(
 			_("Starting %s %s..."), "Podboat", utils::program_version())
 		<< std::endl;
 
-	fslock = std::unique_ptr<FsLock>(new FsLock());
+	fslock = std::make_unique<FsLock>();
 	pid_t pid;
 	std::string error_message;
 	if (!fslock->try_lock(lock_file, pid, error_message)) {
@@ -288,9 +309,9 @@ int PbController::run(PbView& v)
 
 	std::cout << _("done.") << std::endl;
 
-	ql.reset(new QueueLoader(queue_file, cfg, [&]() {
+	ql = std::make_unique<QueueLoader>(queue_file, cfg, [&]() {
 		v.set_view_update_necessary();
-	}));
+	});
 	ql->reload(downloads_);
 
 	v.run(automatic_dl, cfg.get_configvalue_as_bool("wrap-scroll"));
@@ -341,14 +362,19 @@ void PbController::print_usage(const char* argv0)
 			_s("<queuefile>"),
 			_s("use <queuefile> as queue file")
 		},
+		{
+			'-',
+			"lock-file",
+			_s("<lockfile>"),
+			_s("use <lockfile> as lock file")
+		},
 		{'a', "autodownload", "", _s("start download on startup")},
 		{
 			'l',
 			"log-level",
 			_s("<loglevel>"),
-			_s("write a log with a certain loglevel (valid values: "
-				"1 to "
-				"6)")
+			_s("write a log with a certain log level (valid values: 1 to 6,"
+				" for user error, critical, error, warning, info, and debug respectively)")
 		},
 		{
 			'd',
@@ -360,9 +386,15 @@ void PbController::print_usage(const char* argv0)
 	};
 
 	for (const auto& a : args) {
-		std::string longcolumn("-");
-		longcolumn += a.name;
-		longcolumn += ", --" + a.longname;
+		std::string longcolumn;
+		if (a.name != '-') {
+			longcolumn += "-";
+			longcolumn += a.name;
+			longcolumn += ", ";
+		} else {
+			longcolumn += "    ";
+		}
+		longcolumn += "--" + a.longname;
 		longcolumn += a.params.size() > 0 ? "=" + a.params : "";
 		std::cout << "\t" << longcolumn;
 		for (unsigned int j = 0; j < utils::gentabs(longcolumn); j++) {

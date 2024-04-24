@@ -37,3 +37,4 @@ doc/podboat-cmds-linked.asciidoc
 .ccls-cache/
 .cargo_home/
 compile_commands.json
+/compile_flags.txt

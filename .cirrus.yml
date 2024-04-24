@@ -5,10 +5,14 @@ freebsd_resource_settings: &freebsd_resource_settings
 task:
     skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/*', 'docker/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
     matrix:
-        - name: FreeBSD 13.2
+        - name: FreeBSD 13.3
           freebsd_instance:
-            image: freebsd-13-2-release-amd64
+            image: freebsd-13-3-release-amd64
             << : *freebsd_resource_settings
+        - name: FreeBSD 14.0
+          freebsd_instance:
+            image: freebsd-14-0-release-amd64-ufs
+            <<: *freebsd_resource_settings
 
     cargo_cache: &cargo_cache
         # This works in conjunction with after_cache_script and
@@ -23,6 +27,8 @@ task:
     env:
         HOME: /home/testuser
         RUSTFLAGS: '-D warnings'
+        # Workaround for https://github.com/Koka/gettext-rs/issues/117
+        CFLAGS: '-Wno-error=incompatible-function-pointer-types'
 
     after_cache_script: &after_cache_script
       - mkdir $HOME/.cargo || true
@@ -33,7 +39,7 @@ task:
         - sed -i.bak -e 's,pkg+http://pkg.FreeBSD.org/\${ABI}/quarterly,pkg+http://pkg.FreeBSD.org/\${ABI}/latest,' /etc/pkg/FreeBSD.conf
         - pkg update -f
         - pkg upgrade -y
-        - pkg install -y rust gmake rubygem-asciidoctor pkgconf stfl curl json-c ncurses openssl sqlite3 gettext-tools libxml2
+        - pkg install -y rust gmake rubygem-asciidoctor pkgconf stfl curl json-c ncurses openssl ca_root_nss sqlite3 gettext-tools libxml2
     setup_script:
         - pw groupadd testgroup
         - pw useradd testuser -g testgroup -w none -m
@@ -122,7 +128,7 @@ task:
                 cxx_package: g++-5
                 cc: gcc-5
                 cxx: g++-5
-                rust_version: 1.70.0
+                rust_version: 1.72.1
         - name: MSRV, GCC 13 (Ubuntu 23.10)
           container:
             greedy: true
@@ -131,7 +137,7 @@ task:
                 cxx_package: g++-13
                 cc: gcc-13
                 cxx: g++-13
-                rust_version: 1.70.0
+                rust_version: 1.72.1
 
         - name: GCC 13, more warnings and checks (Ubuntu 23.10)
           container:
@@ -456,3 +462,25 @@ task:
       # We need parentheses to prevent YAML parser from eating up the
       # exclamation mark.
       - ( ! grep -Ern '\<dbg!' * )
+
+task:
+    name: clang-tidy (Clang 17, Ubuntu 23.10)
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+
+    container:
+      greedy: true
+      dockerfile: docker/ubuntu_23.10-build-tools.dockerfile
+      docker_arguments:
+          cxx_package: "clang-tidy-17"
+          cc: clang-17
+          cxx: clang++-17
+
+    env:
+      CLANG_TIDY: "clang-tidy-17"
+      JOBS: 2
+
+    cargo_cache: *cargo_cache
+
+    after_cache_script: *after_cache_script
+    test_script: make -j${JOBS} --keep-going clang-tidy
+    before_cache_script: *before_cache_script

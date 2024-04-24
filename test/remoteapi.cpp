@@ -62,13 +62,15 @@ TEST_CASE("get_credentials() returns the users name and password",
 	ConfigParser cfgparser;
 	cfg.register_commands(cfgparser);
 	cfgparser.parse_file("data/test-config-credentials.txt");
-	std::unique_ptr<test_api> api(new test_api(cfg));
+	auto api = std::make_unique<test_api>(cfg);
 	REQUIRE(api->get_user("ttrss", "") == "ttrss-user");
 	REQUIRE(api->get_pass("ttrss", "") == "my-birthday");
 	REQUIRE(api->get_pass("ocnews", "") == "dadada");
 	REQUIRE(api->get_pass("oldreader", "") == "123456");
 	REQUIRE(api->get_user("miniflux", "") == "miniflux-user");
 	REQUIRE(api->get_pass("miniflux", "") == "securepassw0rd");
+	REQUIRE(api->get_user("feedbin", "") == "feedbin-user");
+	REQUIRE(api->get_pass("feedbin", "") == "feedbin-pass");
 	// test cases that would raise a prompt and ask for username or password
 	// can not be covered at the moment and would require a redesign of this
 	// method with a sole purpose to make it testable.

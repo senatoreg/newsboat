@@ -21,30 +21,31 @@ namespace newsboat {
 History FormAction::searchhistory;
 History FormAction::cmdlinehistory;
 
-FormAction::FormAction(View* vv, std::string formstr, ConfigContainer* cfg)
+FormAction::FormAction(View& vv, std::string formstr, ConfigContainer* cfg)
 	: v(vv)
 	, cfg(cfg)
 	, f(formstr)
 	, do_redraw(true)
+	, head_line(f, "head")
+	, msg_line(f, "msg")
+	, qna_prompt_line(f, "qna_prompt")
 	, finish_operation(OP_NIL)
 	, qna_history(nullptr)
 {
-	if (v) {
-		if (cfg->get_configvalue_as_bool("show-keymap-hint") == false) {
-			set_value("showhint", "0");
-		}
-		if (cfg->get_configvalue_as_bool("show-title-bar") == false) {
-			set_value("showtitle", "0");
-		}
-		if (cfg->get_configvalue_as_bool("swap-title-and-hints") ==
-			true) {
-			std::string hints = f.dump("hints", "", 0);
-			std::string title = f.dump("title", "", 0);
-			f.modify("title", "replace", "label[swap-title]");
-			f.modify("hints", "replace", "label[swap-hints]");
-			f.modify("swap-title", "replace", hints);
-			f.modify("swap-hints", "replace", title);
-		}
+	if (cfg->get_configvalue_as_bool("show-keymap-hint") == false) {
+		set_value("showhint", "0");
+	}
+	if (cfg->get_configvalue_as_bool("show-title-bar") == false) {
+		set_value("showtitle", "0");
+	}
+	if (cfg->get_configvalue_as_bool("swap-title-and-hints") ==
+		true) {
+		std::string hints = f.dump("hints", "", 0);
+		std::string title = f.dump("title", "", 0);
+		f.modify("title", "replace", "label[swap-title]");
+		f.modify("hints", "replace", "label[swap-hints]");
+		f.modify("swap-title", "replace", hints);
+		f.modify("swap-hints", "replace", title);
 	}
 	valid_cmds.push_back("set");
 	valid_cmds.push_back("quit");
@@ -55,11 +56,9 @@ FormAction::FormAction(View* vv, std::string formstr, ConfigContainer* cfg)
 
 void FormAction::set_keymap_hints()
 {
-	set_value("help", v->get_keymap()->prepare_keymap_hint(this->get_keymap_hint(),
+	set_value("help", v.get_keymap()->prepare_keymap_hint(this->get_keymap_hint(),
 			this->id()));
 }
-
-FormAction::~FormAction() {}
 
 std::string FormAction::get_value(const std::string& name)
 {
@@ -69,6 +68,11 @@ std::string FormAction::get_value(const std::string& name)
 void FormAction::set_value(const std::string& name, const std::string& value)
 {
 	f.set(name, value);
+}
+
+void FormAction::set_status(const std::string& text)
+{
+	msg_line.set_text(text);
 }
 
 void FormAction::draw_form()
@@ -94,7 +98,7 @@ void FormAction::start_cmdline(std::string default_value)
 {
 	std::vector<QnaPair> qna;
 	qna.push_back(QnaPair(":", default_value));
-	v->inside_cmdline(true);
+	v.inside_cmdline(true);
 	this->start_qna(qna, OP_INT_END_CMDLINE, &FormAction::cmdlinehistory);
 }
 
@@ -126,7 +130,7 @@ bool FormAction::process_op(Operation op,
 					return true;
 				}
 			}
-			v->get_statusline().show_error(_("usage: set <config-option> <value>"));
+			v.get_statusline().show_error(_("usage: set <config-option> <value>"));
 			return false;
 		case BindingType::BindKey:
 			LOG(Level::WARN,
@@ -135,13 +139,13 @@ bool FormAction::process_op(Operation op,
 		}
 		break;
 	case OP_VIEWDIALOGS:
-		v->view_dialogs();
+		v.view_dialogs();
 		break;
 	case OP_NEXTDIALOG:
-		v->goto_next_dialog();
+		v.goto_next_dialog();
 		break;
 	case OP_PREVDIALOG:
-		v->goto_prev_dialog();
+		v.goto_prev_dialog();
 		break;
 	default:
 		return this->process_operation(op, args, bindingType);
@@ -201,7 +205,7 @@ std::vector<std::string> FormAction::get_suggestions(
 			} else if (tokens[0] == "exec") {
 				if (tokens.size() <= 2) {
 					const std::string start = (tokens.size() == 2) ? tokens[1] : "";
-					const std::vector<KeyMapDesc> descs = v->get_keymap()->get_keymap_descriptions(
+					const std::vector<KeyMapDesc> descs = v.get_keymap()->get_keymap_descriptions(
 							this->id()
 						);
 					for (const KeyMapDesc& desc: descs) {
@@ -243,7 +247,7 @@ void FormAction::handle_set(const std::vector<std::string>& args)
 		if (handle_single_argument_set(args[0])) {
 			return;
 		}
-		v->get_statusline().show_message(strprintf::fmt("  %s=%s",
+		v.get_statusline().show_message(strprintf::fmt("  %s=%s",
 				args[0],
 				utils::quote_if_necessary(cfg->get_configvalue(args[0]))));
 	} else if (args.size() == 2) {
@@ -253,30 +257,30 @@ void FormAction::handle_set(const std::vector<std::string>& args)
 		// because some configuration value might have changed something UI-related
 		set_redraw(true);
 	} else {
-		v->get_statusline().show_error(
+		v.get_statusline().show_error(
 			_("usage: set <variable>[=<value>]"));
 	}
 }
 
 void FormAction::handle_quit()
 {
-	while (v->formaction_stack_size() > 0) {
-		v->pop_current_formaction();
+	while (v.formaction_stack_size() > 0) {
+		v.pop_current_formaction();
 	}
 }
 
 void FormAction::handle_source(const std::vector<std::string>& args)
 {
 	if (args.empty()) {
-		v->get_statusline().show_error(_("usage: source <file> [...]"));
+		v.get_statusline().show_error(_("usage: source <file> [...]"));
 	} else {
 		for (const auto& param : args) {
 			try {
-				v->get_ctrl()->load_configfile(
+				v.get_ctrl()->load_configfile(
 					utils::resolve_tilde(
 						param));
 			} catch (const ConfigException& ex) {
-				v->get_statusline().show_error(ex.what());
+				v.get_statusline().show_error(ex.what());
 				break;
 			}
 		}
@@ -286,11 +290,11 @@ void FormAction::handle_source(const std::vector<std::string>& args)
 void FormAction::handle_dumpconfig(const std::vector<std::string>& args)
 {
 	if (args.size() != 1) {
-		v->get_statusline().show_error(_("usage: dumpconfig <file>"));
+		v.get_statusline().show_error(_("usage: dumpconfig <file>"));
 	} else {
-		v->get_ctrl()->dump_config(
+		v.get_ctrl()->dump_config(
 			utils::resolve_tilde(args[0]));
-		v->get_statusline().show_message(strprintf::fmt(
+		v.get_statusline().show_message(strprintf::fmt(
 				_("Saved configuration to %s"),
 				args[0]));
 	}
@@ -299,14 +303,14 @@ void FormAction::handle_dumpconfig(const std::vector<std::string>& args)
 void FormAction::handle_exec(const std::vector<std::string>& args)
 {
 	if (args.size() != 1) {
-		v->get_statusline().show_error(_("usage: exec <operation>"));
+		v.get_statusline().show_error(_("usage: exec <operation>"));
 	} else {
-		const auto op = v->get_keymap()->get_opcode(args[0]);
+		const auto op = v.get_keymap()->get_opcode(args[0]);
 		if (op != OP_NIL) {
 			std::vector<std::string> args;
 			process_op(op, args);
 		} else {
-			v->get_statusline().show_error(_("Operation not found"));
+			v.get_statusline().show_error(_("Operation not found"));
 		}
 	}
 }
@@ -330,7 +334,7 @@ void FormAction::handle_parsed_command(const Command& command)
 		handle_exec(command.args);
 		break;
 	case CommandType::UNKNOWN:
-		v->get_statusline().show_error(strprintf::fmt(_("Not a command: %s"), command.args[0]));
+		v.get_statusline().show_error(strprintf::fmt(_("Not a command: %s"), command.args[0]));
 		break;
 	case CommandType::INVALID:
 		break;
@@ -445,7 +449,7 @@ void FormAction::start_qna(const std::vector<QnaPair>& prompts,
 	qna_responses.clear();
 	finish_operation = finish_op;
 	qna_history = h;
-	v->inside_qna(true);
+	v.inside_qna(true);
 	start_next_question();
 }
 
@@ -459,15 +463,15 @@ void FormAction::cancel_qna()
 {
 	LOG(Level::DEBUG, "FormAction::cancel_qna");
 
-	f.set("show_qna_label", "0");
+	qna_prompt_line.hide();
 	f.set("show_qna_input", "0");
-	f.set("show_msg", "1");
-	f.set("msg", "");
+	msg_line.show();
+	msg_line.set_text("");
 
 	f.set_focus(main_widget());
 
-	v->inside_qna(false);
-	v->inside_cmdline(false);
+	v.inside_qna(false);
+	v.inside_cmdline(false);
 }
 
 void FormAction::qna_next_history()
@@ -490,8 +494,8 @@ void FormAction::qna_previous_history()
 
 void FormAction::finished_qna(Operation op)
 {
-	v->inside_qna(false);
-	v->inside_cmdline(false);
+	v.inside_qna(false);
+	v.inside_cmdline(false);
 	switch (op) {
 	/*
 	 * since bookmarking is available in several formactions, I decided to
@@ -506,15 +510,15 @@ void FormAction::finished_qna(Operation op)
 	case OP_INT_BM_END: {
 		assert(qna_responses.size() == 4 &&
 			qna_prompts.size() == 0); // everything must be answered
-		v->get_statusline().show_message(_("Saving bookmark..."));
+		v.get_statusline().show_message(_("Saving bookmark..."));
 		std::string retval = bookmark(qna_responses[0],
 				qna_responses[1],
 				qna_responses[2],
 				qna_responses[3]);
 		if (retval.length() == 0) {
-			v->get_statusline().show_message(_("Saved bookmark."));
+			v.get_statusline().show_message(_("Saved bookmark."));
 		} else {
-			v->get_statusline().show_message(
+			v.get_statusline().show_message(
 				_s("Error while saving bookmark: ") + retval);
 			LOG(Level::DEBUG,
 				"FormAction::finished_qna: error while saving "
@@ -534,6 +538,11 @@ void FormAction::finished_qna(Operation op)
 	default:
 		break;
 	}
+}
+
+void FormAction::set_title(const std::string& title)
+{
+	head_line.set_text(title);
 }
 
 void FormAction::start_bookmark_qna(const std::string& default_title,
@@ -573,15 +582,15 @@ void FormAction::start_bookmark_qna(const std::string& default_title,
 		if (default_url.empty() || title.empty()) {
 			start_qna(prompts, OP_INT_BM_END);
 		} else {
-			v->get_statusline().show_message(_("Saving bookmark on autopilot..."));
+			v.get_statusline().show_message(_("Saving bookmark on autopilot..."));
 			std::string retval = bookmark(default_url,
 					title,
 					"",
 					default_feed_title);
 			if (retval.length() == 0) {
-				v->get_statusline().show_message(_("Saved bookmark."));
+				v.get_statusline().show_message(_("Saved bookmark."));
 			} else {
-				v->get_statusline().show_message(
+				v.get_statusline().show_message(
 					_s("Error while saving bookmark: ") +
 					retval);
 				LOG(Level::DEBUG,
@@ -600,29 +609,29 @@ Command FormAction::parse_command(const std::string& input,
 {
 	auto tokens = utils::tokenize_quoted(input, delimiters);
 	if (tokens.empty()) {
-		return Command { .type = CommandType::INVALID, .args = {} };
+		return Command(CommandType::INVALID);
 	} else {
 		auto cmd_name = tokens.front();
 		tokens.erase(tokens.begin());
 		if (cmd_name == "set") {
-			return Command { .type = CommandType::SET, .args = std::move(tokens) };
+			return Command(CommandType::SET, std::move(tokens));
 		} else if (cmd_name == "q" || cmd_name == "quit") {
-			return Command { .type = CommandType::QUIT, .args = std::move(tokens) };
+			return Command(CommandType::QUIT, std::move(tokens));
 		} else if (cmd_name == "source") {
-			return Command { .type = CommandType::SOURCE, .args = std::move(tokens) };
+			return Command(CommandType::SOURCE, std::move(tokens));
 		} else if (cmd_name == "dumpconfig") {
-			return Command { .type = CommandType::DUMPCONFIG, .args = std::move(tokens) };
+			return Command(CommandType::DUMPCONFIG, std::move(tokens));
 		} else if (cmd_name == "exec") {
-			return Command { .type = CommandType::EXEC, .args = std::move(tokens) };
+			return Command(CommandType::EXEC, std::move(tokens));
 		} else if (cmd_name == "tag") {
-			return Command { .type = CommandType::TAG, .args = std::move(tokens) };
+			return Command(CommandType::TAG, std::move(tokens));
 		} else if (cmd_name == "goto") {
-			return Command { .type = CommandType::GOTO, .args = std::move(tokens) };
+			return Command(CommandType::GOTO, std::move(tokens));
 		} else if (cmd_name == "save") {
-			return Command { .type = CommandType::SAVE, .args = std::move(tokens) };
+			return Command(CommandType::SAVE, std::move(tokens));
 		} else {
 			tokens.insert(tokens.begin(), std::move(cmd_name));
-			return Command { .type = CommandType::UNKNOWN, .args = std::move(tokens) };
+			return Command(CommandType::UNKNOWN, std::move(tokens));
 		}
 	}
 }
@@ -633,12 +642,12 @@ void FormAction::start_next_question()
 	 * If there is one more prompt to be presented to the user, set it up.
 	 */
 	if (qna_prompts.size() > 0) {
-		f.set("qna_prompt", qna_prompts[0].first);
+		qna_prompt_line.set_text(qna_prompts[0].first);
 		f.set("qna_value", qna_prompts[0].second);
 
-		f.set("show_qna_label", "1");
+		qna_prompt_line.show();
 		f.set("show_qna_input", "1");
-		f.set("show_msg", "0");
+		msg_line.hide();
 
 		f.set_focus("qnainput");
 
@@ -654,10 +663,10 @@ void FormAction::start_next_question()
 		 * usual label, and signal the end of the "Q&A" to the
 		 * finished_qna() method.
 		 */
-		f.set("show_qna_label", "0");
+		qna_prompt_line.hide();
 		f.set("show_qna_input", "0");
-		f.set("show_msg", "1");
-		f.set("msg", "");
+		msg_line.show();
+		msg_line.set_text("");
 
 		f.set_focus(main_widget());
 
@@ -699,11 +708,11 @@ std::string FormAction::bookmark(const std::string& url,
 		LOG(Level::DEBUG, "FormAction::bookmark: cmd = %s", cmdline);
 
 		if (is_interactive) {
-			v->push_empty_formaction();
+			v.push_empty_formaction();
 			Stfl::reset();
 			utils::run_interactively(cmdline, "FormAction::bookmark");
-			v->drop_queued_input();
-			v->pop_current_formaction();
+			v.drop_queued_input();
+			v.pop_current_formaction();
 			return "";
 		} else {
 			const char* my_argv[4];

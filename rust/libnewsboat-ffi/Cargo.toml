@@ -1,8 +1,8 @@
 [package]
 name = "libnewsboat-ffi"
-version = "2.34.0"
+version = "2.35.0"
 authors = ["Alexander Batischev <eual.jp@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 libnewsboat = { path="../libnewsboat" }

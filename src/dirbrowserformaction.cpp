@@ -17,6 +17,7 @@
 
 #include "config.h"
 #include "fmtstrformatter.h"
+#include "keycombination.h"
 #include "logger.h"
 #include "strprintf.h"
 #include "utils.h"
@@ -24,22 +25,15 @@
 
 namespace newsboat {
 
-DirBrowserFormAction::DirBrowserFormAction(View* vv,
+DirBrowserFormAction::DirBrowserFormAction(View& vv,
 	std::string formstr,
 	ConfigContainer* cfg)
 	: FormAction(vv, formstr, cfg)
+	, file_prompt_line(f, "fileprompt")
 	, files_list("files", FormAction::f, cfg->get_configvalue_as_int("scrolloff"))
+	, view(vv)
 {
-	// In dirbrowser, keyboard focus is at the input field, so user will be
-	// unable to use alphanumeric keys to confirm or quit the dialog (e.g. they
-	// can't quit with the default `q` bind).
-	KeyMap* keys = vv->get_keymap();
-	keys->set_key(OP_OPEN, "ENTER", id());
-	keys->set_key(OP_QUIT, "ESC", id());
-	vv->set_keymap(keys);
 }
-
-DirBrowserFormAction::~DirBrowserFormAction() {}
 
 bool DirBrowserFormAction::process_operation(Operation op,
 	const std::vector<std::string>& /* args */,
@@ -96,7 +90,7 @@ bool DirBrowserFormAction::process_operation(Operation op,
 				}
 			} else {
 				curs_set(0);
-				v->pop_current_formaction();
+				v.pop_current_formaction();
 			}
 		}
 	}
@@ -168,13 +162,13 @@ bool DirBrowserFormAction::process_operation(Operation op,
 	case OP_QUIT:
 		LOG(Level::DEBUG, "view::dirbrowser: quitting");
 		curs_set(0);
-		v->pop_current_formaction();
+		v.pop_current_formaction();
 		set_value("filenametext", "");
 		break;
 	case OP_HARDQUIT:
 		LOG(Level::DEBUG, "view::dirbrowser: hard quitting");
-		while (v->formaction_stack_size() > 0) {
-			v->pop_current_formaction();
+		while (v.formaction_stack_size() > 0) {
+			v.pop_current_formaction();
 		}
 		set_value("filenametext", "");
 		break;
@@ -193,10 +187,8 @@ void DirBrowserFormAction::update_title(const std::string& working_directory)
 	fmt.register_fmt('V', utils::program_version());
 	fmt.register_fmt('f', working_directory);
 
-	const std::string title = fmt.do_format(
-			cfg->get_configvalue("dirbrowser-title-format"), width);
-
-	set_value("head", title);
+	set_title(fmt.do_format(
+			cfg->get_configvalue("dirbrowser-title-format"), width));
 }
 
 std::vector<std::string> get_sorted_dirlist()
@@ -275,9 +267,17 @@ void DirBrowserFormAction::prepare()
 
 void DirBrowserFormAction::init()
 {
+	// In dirbrowser, keyboard focus is at the input field, so user will be
+	// unable to use alphanumeric keys to confirm or quit the dialog (e.g. they
+	// can't quit with the default `q` bind).
+	KeyMap* keys = view.get_keymap();
+	keys->set_key(OP_OPEN, KeyCombination("ENTER"), id());
+	keys->set_key(OP_QUIT, KeyCombination("ESC"), id());
+	view.set_keymap(keys);
+
 	set_keymap_hints();
 
-	set_value("fileprompt", _("Directory: "));
+	file_prompt_line.set_text(_("Directory: "));
 
 	const std::string save_path = cfg->get_configvalue("save-path");
 

@@ -14,7 +14,7 @@
 
 namespace newsboat {
 
-HelpFormAction::HelpFormAction(View* vv,
+HelpFormAction::HelpFormAction(View& vv,
 	std::string formstr,
 	ConfigContainer* cfg,
 	const std::string& ctx)
@@ -25,8 +25,6 @@ HelpFormAction::HelpFormAction(View* vv,
 	, textview("helptext", FormAction::f)
 {
 }
-
-HelpFormAction::~HelpFormAction() {}
 
 bool HelpFormAction::process_operation(Operation op,
 	const std::vector<std::string>& /* args */,
@@ -57,11 +55,11 @@ bool HelpFormAction::process_operation(Operation op,
 		break;
 	}
 	if (hardquit) {
-		while (v->formaction_stack_size() > 0) {
-			v->pop_current_formaction();
+		while (v.formaction_stack_size() > 0) {
+			v.pop_current_formaction();
 		}
 	} else if (quit) {
-		v->pop_current_formaction();
+		v.pop_current_formaction();
 	}
 	return true;
 }
@@ -76,10 +74,9 @@ void HelpFormAction::prepare()
 		FmtStrFormatter fmt;
 		fmt.register_fmt('N', PROGRAM_NAME);
 		fmt.register_fmt('V', utils::program_version());
-		set_value("head",
-			fmt.do_format(cfg->get_configvalue("help-title-format"), width));
+		set_title(fmt.do_format(cfg->get_configvalue("help-title-format"), width));
 
-		const auto descs = v->get_keymap()->get_keymap_descriptions(context);
+		const auto descs = v.get_keymap()->get_keymap_descriptions(context);
 
 		std::vector<std::string> colors = utils::tokenize(
 				cfg->get_configvalue("search-highlight-colors"), " ");
@@ -93,7 +90,7 @@ void HelpFormAction::prepare()
 		for (const auto& desc : descs) {
 			if (desc.flags & KM_SYSKEYS) {
 				syskey_descriptions.push_back(desc);
-			} else if (desc.key.empty()) {
+			} else if (desc.key.get_key().empty()) {
 				unbound_descriptions.push_back(desc);
 			} else {
 				bound_descriptions.push_back(desc);
@@ -102,7 +99,7 @@ void HelpFormAction::prepare()
 
 		const auto should_be_visible = [&](const KeyMapDesc& desc) {
 			return !apply_search
-				|| strcasestr(desc.key.c_str(), searchphrase.c_str()) != nullptr
+				|| strcasestr(desc.key.to_bindkey_string().c_str(), searchphrase.c_str()) != nullptr
 				|| strcasestr(desc.cmd.c_str(), searchphrase.c_str()) != nullptr
 				|| strcasestr(desc.desc.c_str(), searchphrase.c_str()) != nullptr;
 		};
@@ -117,7 +114,10 @@ void HelpFormAction::prepare()
 
 		for (const auto& desc : bound_descriptions) {
 			if (should_be_visible(desc)) {
-				auto line = strprintf::fmt("%-15s %-23s %s", desc.key, desc.cmd, desc.desc);
+				auto line = strprintf::fmt("%-15s %-23s %s",
+						desc.key.to_bindkey_string(),
+						desc.cmd,
+						desc.desc);
 				line = utils::quote_for_stfl(line);
 				line = apply_highlights(line);
 				listfmt.add_line(line);
@@ -131,7 +131,10 @@ void HelpFormAction::prepare()
 
 			for (const auto& desc : syskey_descriptions) {
 				if (should_be_visible(desc)) {
-					auto line = strprintf::fmt("%-15s %-23s %s", desc.key, desc.cmd, desc.desc);
+					auto line = strprintf::fmt("%-15s %-23s %s",
+							desc.key.to_bindkey_string(),
+							desc.cmd,
+							desc.desc);
 					line = utils::quote_for_stfl(line);
 					line = apply_highlights(line);
 					listfmt.add_line(line);
@@ -154,14 +157,14 @@ void HelpFormAction::prepare()
 			}
 		}
 
-		const auto macros = v->get_keymap()->get_macro_descriptions();
+		const auto macros = v.get_keymap()->get_macro_descriptions();
 		if (!macros.empty()) {
 			listfmt.add_line("");
 			listfmt.add_line(_("Macros:"));
 			listfmt.add_line("");
 
 			for (const auto& macro : macros) {
-				const std::string key = macro.first;
+				const std::string key = macro.first.to_bindkey_string();
 				const std::string description = macro.second.description;
 
 				// "macro-prefix" is not translated because it refers to an operation name
@@ -195,7 +198,7 @@ const std::vector<KeyMapHintEntry>& HelpFormAction::get_keymap_hint() const
 
 void HelpFormAction::finished_qna(Operation op)
 {
-	v->inside_qna(false);
+	v.inside_qna(false);
 	switch (op) {
 	case OP_INT_START_SEARCH:
 		searchphrase = qna_responses[0];

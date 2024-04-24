@@ -14,8 +14,8 @@ namespace newsboat {
 
 class DirBrowserFormAction : public FormAction {
 public:
-	DirBrowserFormAction(View*, std::string formstr, ConfigContainer* cfg);
-	~DirBrowserFormAction() override;
+	DirBrowserFormAction(View&, std::string formstr, ConfigContainer* cfg);
+	~DirBrowserFormAction() override = default;
 	void prepare() override;
 	void init() override;
 	const std::vector<KeyMapHintEntry>& get_keymap_hint() const override;
@@ -45,9 +45,12 @@ private:
 
 	std::string get_formatted_dirname(std::string dirname, mode_t mode);
 
+	LineView file_prompt_line;
 	std::string cwd;
 
 	ListWidget files_list;
+
+	View& view;
 };
 
 } // namespace newsboat

@@ -26,7 +26,8 @@ DEFINES+=-DPLUGINSDIR='"$(pluginsdir)"'
 
 WARNFLAGS=-Werror -Wall -Wextra -Wunreachable-code
 INCLUDES=-Iinclude -Istfl -Ifilter -I. -Irss -I$(CARGO_TARGET_DIR)/cxxbridge/
-BARE_CXXFLAGS=-std=c++11 -O2 -ggdb $(INCLUDES) -fPIC
+# Keep in sync with c++ version specified in FFI build.rs
+BARE_CXXFLAGS=-std=c++14 -O2 -ggdb $(INCLUDES) -fPIC
 LDFLAGS+=-L.
 
 # Constants
@@ -122,6 +123,7 @@ MSGFMT=msgfmt
 RANLIB?=ranlib
 AR?=ar
 CARGO=cargo
+CLANG_TIDY?=clang-tidy
 
 TEXTCONV=./txt2h
 RM=rm -f
@@ -306,7 +308,8 @@ doc/example-config: doc/gen-example-config doc/configcommands.dsv
 fmt:
 	astyle --project \
 		*.cpp doc/*.cpp include/*.h rss/*.h rss/*.cpp src/*.cpp \
-		test/*.cpp test/test_helpers/*.h test/test_helpers/*.cpp
+		test/*.cpp test/test_helpers/*.h test/test_helpers/*.cpp \
+		test/test_helpers/stringmaker/*.h
 	$(CARGO) fmt
 	# We reset the locale to make the sorting reproducible.
 	LC_ALL=C sort -t '|' -k 1,1 -o doc/configcommands.dsv doc/configcommands.dsv
@@ -328,6 +331,18 @@ cppcheck:
 		include newsboat.cpp podboat.cpp rss src stfl test \
 		2>cppcheck.log
 	@echo "Done! See cppcheck.log for details."
+
+# A config for clang-tidy to explain where to get the headers
+compile_flags.txt: Makefile
+	echo $(INCLUDES) $(DEFINES) | tr ' ' '\n' > $@
+
+# This target has a slash in its name in order to force GNU Make to process the
+# slashes in the "%" pattern. See "How Patterns Match" section in the GNU Make
+# documention.
+PHONY/clang-tidy-%: compile_flags.txt xlicense.h $(STFL_HDRS) $(NEWSBOATLIB_OUTPUT)
+	$(CLANG_TIDY) $(@:PHONY/clang-tidy-%=%)
+
+clang-tidy: $(addprefix PHONY/clang-tidy-,$(LIB_SRCS) $(NEWSBOAT_SRCS) $(RSSPPLIB_SRCS) $(PODBOAT_SRCS) $(TEST_SRCS) newsboat.cpp podboat.cpp)
 
 install-newsboat: $(NEWSBOAT)
 	$(MKDIR) $(DESTDIR)$(prefix)/bin
@@ -388,7 +403,7 @@ uninstall: uninstall-mo
 
 .PHONY: doc clean distclean all test extract install uninstall regenerate-parser clean-newsboat \
 	clean-podboat clean-libboat clean-librsspp clean-libfilter clean-doc install-mo msgmerge clean-mo \
-	clean-test config cppcheck
+	clean-test config cppcheck clang-tidy
 
 # the following targets are i18n/l10n-related:
 

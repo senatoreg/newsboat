@@ -7,6 +7,7 @@
 
 #include "history.h"
 #include "keymap.h"
+#include "lineview.h"
 #include "listwidget.h"
 #include "stflpp.h"
 
@@ -41,12 +42,17 @@ enum class BindingType {
 struct Command {
 	CommandType type;
 	std::vector<std::string> args;
+
+	Command(CommandType type, std::vector<std::string> args = {})
+		: type(type)
+		, args(args)
+	{}
 };
 
 class FormAction {
 public:
-	FormAction(View*, std::string formstr, ConfigContainer* cfg);
-	virtual ~FormAction();
+	FormAction(View&, std::string formstr, ConfigContainer* cfg);
+	virtual ~FormAction() = default;
 	virtual void prepare() = 0;
 	virtual void init() = 0;
 	virtual void set_redraw(bool b)
@@ -60,6 +66,7 @@ public:
 
 	std::string get_value(const std::string& name);
 	void set_value(const std::string& name, const std::string& value);
+	void set_status(const std::string& text);
 
 	void draw_form();
 	std::string draw_form_wait_for_event(unsigned int timeout);
@@ -118,6 +125,8 @@ protected:
 	/// by default.
 	virtual std::string main_widget() const = 0;
 
+	void set_title(const std::string& title);
+
 	void start_bookmark_qna(const std::string& default_title,
 		const std::string& default_url,
 		const std::string& default_feed_title);
@@ -130,7 +139,7 @@ protected:
 	bool handle_list_operations(ListWidget& list, Operation op);
 	bool handle_textview_operations(TextviewWidget& textview, Operation op);
 
-	View* v;
+	View& v;
 	ConfigContainer* cfg;
 	Stfl::Form f;
 	bool do_redraw;
@@ -151,6 +160,9 @@ private:
 	void handle_dumpconfig(const std::vector<std::string>& args);
 	void handle_exec(const std::vector<std::string>& args);
 
+	LineView head_line;
+	LineView msg_line;
+	LineView qna_prompt_line;
 	std::vector<QnaPair> qna_prompts;
 	Operation finish_operation;
 	History* qna_history;

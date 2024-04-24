@@ -15,6 +15,7 @@
 #include <libxml/tree.h>
 #include <libxml/xmlsave.h>
 #include <libxml/xmlversion.h>
+#include <memory>
 #include <mutex>
 #include <pwd.h>
 #include <signal.h>
@@ -35,6 +36,8 @@
 #include "feedhqapi.h"
 #include "feedhqurlreader.h"
 #include "formaction.h"
+#include "feedbinapi.h"
+#include "feedbinurlreader.h"
 #include "freshrssapi.h"
 #include "freshrssurlreader.h"
 #include "fileurlreader.h"
@@ -251,8 +254,7 @@ int Controller::run(const CliArgsParser& args)
 		std::cout << _("done.") << std::endl;
 	}
 
-	reloader =
-		std::unique_ptr<Reloader>(new Reloader(this, rsscache, cfg));
+	reloader = std::make_unique<Reloader>(this, rsscache, cfg);
 
 	std::string type = cfg.get_configvalue("urls-source");
 	if (type == "local") {
@@ -288,6 +290,23 @@ int Controller::run(const CliArgsParser& args)
 	} else if (type == "feedhq") {
 		api = new FeedHqApi(cfg);
 		urlcfg = new FeedHqUrlReader(&cfg, configpaths.url_file(), api);
+	} else if (type == "feedbin") {
+		const std::string user = cfg.get_configvalue("feedbin-login");
+		const std::string pass = cfg.get_configvalue("feedbin-password");
+		const std::string pass_file = cfg.get_configvalue("feedbin-passwordfile");
+		const std::string pass_eval = cfg.get_configvalue("feedbin-passwordeval");
+		const bool creds_set = !user.empty() &&
+			(!pass.empty() || !pass_file.empty() || !pass_eval.empty());
+		if (!creds_set) {
+			std::cerr <<
+				_("ERROR: You must set `feedbin-login` and one of `feedbin-password`, "
+					"`feedbin-passwordfile` or `feedbin-passwordeval` to use "
+					"Feedbin\n");
+			return EXIT_FAILURE;
+		}
+
+		api = new FeedbinApi(cfg);
+		urlcfg = new FeedbinUrlReader(configpaths.url_file(), api);
 	} else if (type == "freshrss") {
 		const auto freshrss_url = cfg.get_configvalue("freshrss-url");
 		if (freshrss_url.empty()) {
@@ -341,7 +360,7 @@ int Controller::run(const CliArgsParser& args)
 		}
 
 		api = new MinifluxApi(cfg);
-		urlcfg = new MinifluxUrlReader(configpaths.url_file(), api);
+		urlcfg = new MinifluxUrlReader(&cfg, configpaths.url_file(), api);
 	} else if (type == "inoreader") {
 		const auto all_set = !cfg.get_configvalue("inoreader-app-id").empty()
 			&& !cfg.get_configvalue("inoreader-app-key").empty();
@@ -416,6 +435,11 @@ int Controller::run(const CliArgsParser& args)
 					_("It looks like you haven't configured any "
 						"feeds in your Miniflux account. Please do "
 						"so, and try again."));
+		} else if (type == "feedbin") {
+			msg = strprintf::fmt(
+					_("It looks like you haven't configured any "
+						"feeds in your Feedbin account. Please do "
+						"so, and try again."));
 		} else if (type == "ocnews") {
 			msg = strprintf::fmt(
 					_("It looks like you haven't configured any feeds in your "
@@ -486,7 +510,6 @@ int Controller::run(const CliArgsParser& args)
 		return EXIT_SUCCESS;
 	}
 
-
 	// if configured, we fill all query feeds with some data; no need to
 	// sort it, it will be refilled when actually opening it.
 	if (cfg.get_configvalue_as_bool("prepopulate-query-feeds")) {
@@ -551,7 +574,7 @@ int Controller::run(const CliArgsParser& args)
 	}
 
 	FormAction::load_histories(
-		configpaths.search_file(), configpaths.cmdline_file());
+		configpaths.search_history_file(), configpaths.cmdline_history_file());
 
 	// run the View
 	int ret = v->run();
@@ -559,8 +582,8 @@ int Controller::run(const CliArgsParser& args)
 	unsigned int history_limit =
 		cfg.get_configvalue_as_int("history-limit");
 	LOG(Level::DEBUG, "Controller::run: history-limit = %u", history_limit);
-	FormAction::save_histories(configpaths.search_file(),
-		configpaths.cmdline_file(),
+	FormAction::save_histories(configpaths.search_history_file(),
+		configpaths.cmdline_history_file(),
 		history_limit);
 
 	if (!args.silent()) {

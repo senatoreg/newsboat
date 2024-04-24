@@ -71,7 +71,7 @@ Debian and derivatives, headers are in `-dev` packages, e.g. `libsqlite3-dev`.)
 - GNU Make 4.0 or newer
 - GCC 5.0 or newer, or Clang 3.6 or newer
 - Stable https://www.rust-lang.org/en-US/[Rust] and Cargo (Rust's package
-  manager) (1.70.0 or newer; might work with older versions, but we don't check
+  manager) (1.72.1 or newer; might work with older versions, but we don't check
   that)
 - https://github.com/newsboat/stfl[STFL (version 0.21 or newer)] (the link
   points to our own fork because http://www.clifford.at/stfl/[the upstream] is
@@ -393,6 +393,20 @@ other readers like FeedHQ. Thus, one can leverage Newsboat's support for FeedHQ
 See <<_passwords_for_external_apis>> for other, more secure ways to store your
 password.
 
+=== Feedbin
+
+_Supported since Newsboat 2.35_.
+
+https://feedbin.com[Feedbin] is a web-based RSS reader.
+To use it, point Newsboat to your Feedbin account:
+
+	urls-source "feedbin"
+	feedbin-login "myusername"
+	feedbin-password "mypassword"
+
+See <<_passwords_for_external_apis>> for other, more secure ways to store your
+password.
+
 === FreshRSS
 
 _Supported since Newsboat 2.24_.
@@ -670,8 +684,23 @@ It is also possible to specify an API token instead of the username/password com
 See also <<miniflux-tokenfile,`miniflux-tokenfile`>>, and
 <<miniflux-tokeneval,`miniflux-tokeneval`>>.
 
-Unlike with other backends, Miniflux's starring/bookmarking feature is not
-currently supported in Newsboat.
+In addition, Miniflux provides the ability to "star"
+articles. Starred articles are basically bookmarks. Newsboat allows the
+use of this feature by mapping its powerful "flags" to the "star"/"unstar"
+operations.
+
+In order to use this mapping, all you need to do is to configure the flags
+that shall be used:
+
+	miniflux-flag-star "a"
+
+After that, use these flags when you edit flags for an article, and these
+articles will be starred.
+
+By default a "Starred Items" feed is included in the feed list. This can be
+removed with:
+
+	miniflux-show-special-feeds "no"
 
 Miniflux categories are converted into Newsboat tags. You can select and filter
 feeds by tags; see <<_tagging>> and <<_filter_language>> for details.
@@ -1655,9 +1684,9 @@ include::podboat-cmds-linked.asciidoc[]
 MIT License
 
 Copyright 2006-2015 Andreas Krennmair <ak@newsbeuter.org> +
-Copyright 2015-2023 Alexander Batischev <eual.jp@gmail.com> +
+Copyright 2015-2024 Alexander Batischev <eual.jp@gmail.com> +
 Copyright 2006-2017 Newsbeuter contributors +
-Copyright 2017-2023 Newsboat contributors
+Copyright 2017-2024 Newsboat contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

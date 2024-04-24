@@ -14,8 +14,8 @@ namespace newsboat {
 
 class FileBrowserFormAction : public FormAction {
 public:
-	FileBrowserFormAction(View*, std::string formstr, ConfigContainer* cfg);
-	~FileBrowserFormAction() override;
+	FileBrowserFormAction(View&, std::string formstr, ConfigContainer* cfg);
+	~FileBrowserFormAction() override = default;
 	void prepare() override;
 	void init() override;
 	const std::vector<KeyMapHintEntry>& get_keymap_hint() const override;
@@ -51,11 +51,14 @@ private:
 
 	std::string get_formatted_filename(std::string filename, mode_t mode);
 
+	LineView file_prompt_line;
 	bool quit;
 	std::string cwd;
 	std::string default_filename;
 
 	ListWidget files_list;
+
+	View& view;
 };
 
 } // namespace newsboat
