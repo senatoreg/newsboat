@@ -1,13 +1,13 @@
 #include "textformatter.h"
 
 #include <algorithm>
-#include <assert.h>
 #include <cinttypes>
-#include <limits.h>
 
 #include "htmlrenderer.h"
+#include "logger.h"
 #include "regexmanager.h"
 #include "stflpp.h"
+#include "stflrichtext.h"
 #include "strprintf.h"
 #include "utils.h"
 
@@ -160,7 +160,10 @@ std::vector<std::string> format_text_plain_helper(
 			static_cast<unsigned int>(type));
 
 		if (rxman && type != LineType::hr) {
-			rxman->quote_and_highlight(text, location);
+			// TODO: Propagate usage of StflRichText
+			auto x = StflRichText::from_quoted(text);
+			rxman->quote_and_highlight(x, location);
+			text = x.stfl_quoted();
 		}
 
 		switch (type) {

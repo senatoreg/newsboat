@@ -1,8 +1,9 @@
 #ifndef NEWSBOAT_TTRSSAPI_H_
 #define NEWSBOAT_TTRSSAPI_H_
 
+#include <mutex>
+
 #include "3rd-party/json.hpp"
-#include "cache.h"
 #include "remoteapi.h"
 
 namespace rsspp {
@@ -32,7 +33,6 @@ public:
 	bool update_article_flags(const std::string& oldflags,
 		const std::string& newflags,
 		const std::string& guid) override;
-	rsspp::Feed fetch_feed(const std::string& id);
 	rsspp::Feed fetch_feed(const std::string& id, CurlHandle& cached_handle);
 	bool update_article(const std::string& guid, int field, int mode);
 

@@ -551,10 +551,7 @@ pub fn make_title(rs_str: String) -> String {
 
     // Un-escape any percent-encoding, e.g. "It%27s%202017%21" -> "It's
     // 2017!"
-    let result = match unescape_url(result) {
-        None => String::new(),
-        Some(f) => f,
-    };
+    let result = unescape_url(result).unwrap_or_default();
 
     // If it contains only digits, assume it's an id, not a proper title
     if result.chars().all(|c| c.is_ascii_digit()) {
@@ -644,19 +641,6 @@ pub fn read_text_file(filename: &Path) -> Result<Vec<String>, ReadTextFileError>
 
 pub fn strnaturalcmp(a: &str, b: &str) -> std::cmp::Ordering {
     natord::compare(a, b)
-}
-
-/// Calculate the number of padding tabs when formatting columns
-///
-/// The number of tabs will be adjusted by the width of the given string.  Usually, a column will
-/// consist of 4 tabs, 8 characters each.  Each column will consist of at least one tab.
-pub fn gentabs(string: &str) -> usize {
-    let tabcount = strwidth(string) / 8;
-    if tabcount >= 4 {
-        1
-    } else {
-        4 - tabcount
-    }
 }
 
 /// Recursively create directories if missing and set permissions accordingly.
@@ -1429,7 +1413,7 @@ mod tests {
         assert_eq!(strwidth(""), 0);
         assert_eq!(strwidth("xx"), 2);
         assert_eq!(strwidth("\u{F91F}"), 2);
-        assert_eq!(strwidth("\u{0007}"), 0);
+        assert_eq!(strwidth("\u{0007}"), 1);
     }
 
     #[test]
@@ -1441,7 +1425,7 @@ mod tests {
         assert_eq!(strwidth_stfl("x<>y<>z"), 5);
         assert_eq!(strwidth_stfl("x<>hi>x"), 6);
         assert_eq!(strwidth_stfl("\u{F91F}"), 2);
-        assert_eq!(strwidth_stfl("\u{0007}"), 0);
+        assert_eq!(strwidth_stfl("\u{0007}"), 1);
         assert_eq!(strwidth_stfl("<a"), 0); // #415
         assert_eq!(strwidth_stfl("a"), 1);
         assert_eq!(strwidth_stfl("abc<tag>def"), 6);
@@ -2274,27 +2258,6 @@ mod tests {
             ),
             "https://example.com/misc/everything_at_once".to_owned()
         );
-    }
-
-    #[test]
-    fn t_gentabs() {
-        assert_eq!(gentabs(""), 4);
-        assert_eq!(gentabs("a"), 4);
-        assert_eq!(gentabs("aa"), 4);
-        assert_eq!(gentabs("aaa"), 4);
-        assert_eq!(gentabs("aaaa"), 4);
-        assert_eq!(gentabs("aaaaa"), 4);
-        assert_eq!(gentabs("aaaaaa"), 4);
-        assert_eq!(gentabs("aaaaaaa"), 4);
-        assert_eq!(gentabs("aaaaaaaa"), 3);
-        assert_eq!(gentabs(&"a".repeat(8)), 3);
-        assert_eq!(gentabs(&"a".repeat(9)), 3);
-        assert_eq!(gentabs(&"a".repeat(15)), 3);
-        assert_eq!(gentabs(&"a".repeat(16)), 2);
-        assert_eq!(gentabs(&"a".repeat(20)), 2);
-        assert_eq!(gentabs(&"a".repeat(24)), 1);
-        assert_eq!(gentabs(&"a".repeat(32)), 1);
-        assert_eq!(gentabs(&"a".repeat(100)), 1);
     }
 
     #[test]

@@ -7,17 +7,13 @@
 #include <ncurses.h>
 #include <dirent.h>
 #include <grp.h>
-#include <iomanip>
-#include <iostream>
 #include <pwd.h>
-#include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "fmtstrformatter.h"
-#include "listformatter.h"
 #include "logger.h"
 #include "strprintf.h"
 #include "utils.h"
@@ -273,7 +269,7 @@ void FileBrowserFormAction::prepare()
 		}
 
 
-		auto render_line = [this](std::uint32_t line, std::uint32_t width) -> std::string {
+		auto render_line = [this](std::uint32_t line, std::uint32_t width) -> StflRichText {
 			(void)width;
 			return lines[line];
 		};
@@ -354,7 +350,7 @@ void FileBrowserFormAction::add_file(
 				group,
 				sizestr,
 				formattedfilename);
-		lines.push_back(utils::quote_for_stfl(line));
+		lines.push_back(StflRichText::from_plaintext(line));
 		id_at_position.push_back(file_system::FileSystemEntry{ftype, filename});
 	}
 }

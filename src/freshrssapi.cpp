@@ -1,6 +1,5 @@
 #include "freshrssapi.h"
 
-#include <cstring>
 #include <curl/curl.h>
 #include <json.h>
 #include <time.h>
@@ -9,6 +8,7 @@
 #include "config.h"
 #include "curldatareceiver.h"
 #include "curlhandle.h"
+#include "logger.h"
 #include "strprintf.h"
 #include "utils.h"
 #include "rss/feed.h"
@@ -395,12 +395,6 @@ std::string FreshRssApi::post_content(const std::string& url,
 		result);
 
 	return result;
-}
-
-rsspp::Feed FreshRssApi::fetch_feed(const std::string& id)
-{
-	CurlHandle handle;
-	return fetch_feed(id, handle);
 }
 
 rsspp::Feed FreshRssApi::fetch_feed(const std::string& id, CurlHandle& cached_handle)

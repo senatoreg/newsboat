@@ -7,6 +7,7 @@
 
 #include "3rd-party/json.hpp"
 #include "curlhandle.h"
+#include "logger.h"
 #include "rss/feed.h"
 #include "strprintf.h"
 #include "utils.h"
@@ -145,12 +146,6 @@ bool FeedbinApi::mark_article_read(const std::string& guid, bool read)
 	std::vector<std::string> entry_ids;
 	entry_ids.push_back(guid);
 	return mark_entries_read(entry_ids, read);
-}
-
-rsspp::Feed FeedbinApi::fetch_feed(const std::string& id)
-{
-	CurlHandle handle;
-	return fetch_feed(id, handle);
 }
 
 rsspp::Feed FeedbinApi::fetch_feed(const std::string& id,

@@ -1,8 +1,9 @@
 #include "configcontainer.h"
 
+#include <unordered_set>
+
 #include "3rd-party/catch.hpp"
 
-#include "configdata.h"
 #include "confighandlerexception.h"
 #include "configparser.h"
 #include "keymap.h"
@@ -34,7 +35,9 @@ TEST_CASE("Parses test config without exceptions", "[ConfigContainer]")
 	}
 
 	SECTION("Tilde got expanded into path to user's home directory") {
-		std::string cachefilecomp = ::getenv("HOME");
+		char* home = ::getenv("HOME");
+		REQUIRE(home != nullptr);
+		std::string cachefilecomp = home;
 		cachefilecomp.append("/foo");
 		REQUIRE(cfg.get_configvalue("cache-file") == cachefilecomp);
 	}

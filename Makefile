@@ -21,7 +21,7 @@ CXX?=c++
 CXX_FOR_BUILD?=$(CXX)
 
 # compiler and linker flags
-DEFINES=-DLOCALEDIR='"$(localedir)"'
+DEFINES=-DLOCALEDIR='"$(localedir)"' -DCATCH_AMALGAMATED_CUSTOM_MAIN
 DEFINES+=-DPLUGINSDIR='"$(pluginsdir)"'
 
 WARNFLAGS=-Werror -Wall -Wextra -Wunreachable-code
@@ -127,6 +127,7 @@ CLANG_TIDY?=clang-tidy
 
 TEXTCONV=./txt2h
 RM=rm -f
+CP=cp -f
 
 all: doc $(NEWSBOAT) $(PODBOAT) mo-files $(PLUGINS)
 
@@ -164,8 +165,11 @@ test: test/test rust-test
 rust-test:
 	+$(CARGO) test $(CARGO_TEST_FLAGS) --no-run
 
-test/test: xlicense.h $(LIB_OUTPUT) $(NEWSBOATLIB_OUTPUT) $(NEWSBOAT_OBJS) $(PODBOAT_OBJS) $(FILTERLIB_OUTPUT) $(RSSPPLIB_OUTPUT) $(TEST_OBJS)
-	$(CXX) $(CXXFLAGS) -o test/test $(TEST_OBJS) $(SRC_OBJS) $(NEWSBOAT_LIBS) $(LDFLAGS)
+3rd-party/catch.o: 3rd-party/catch.cpp 3rd-party/catch.hpp
+	$(CXX) $(CXXFLAGS) -Wno-double-promotion -o 3rd-party/catch.o -c 3rd-party/catch.cpp
+
+test/test: xlicense.h $(LIB_OUTPUT) $(NEWSBOATLIB_OUTPUT) $(NEWSBOAT_OBJS) $(PODBOAT_OBJS) $(FILTERLIB_OUTPUT) $(RSSPPLIB_OUTPUT) $(TEST_OBJS) 3rd-party/catch.o
+	$(CXX) $(CXXFLAGS) -o test/test $(TEST_OBJS) $(SRC_OBJS) $(NEWSBOAT_LIBS) $(LDFLAGS) 3rd-party/catch.o
 
 regenerate-parser:
 	$(RM) filter/Scanner.cpp filter/Parser.cpp filter/Scanner.h filter/Parser.h
@@ -221,7 +225,7 @@ clean-doc:
 		doc/gen-example-config
 
 clean-test:
-	$(RM) test/test test/*.o test/test_helpers/*.o
+	$(RM) test/test test/*.o test/test_helpers/*.o 3rd-party/catch.o
 
 clean: clean-newsboat clean-podboat clean-libboat clean-libfilter clean-doc clean-mo clean-librsspp clean-libnewsboat clean-test
 	$(RM) $(STFL_HDRS) xlicense.h
@@ -360,22 +364,9 @@ install-docs: doc
 	$(MKDIR) $(DESTDIR)$(docdir)
 	$(INSTALL) -m 644 doc/xhtml/* $(DESTDIR)$(docdir)
 	$(INSTALL) -m 644 CHANGELOG.md $(DESTDIR)$(docdir)
-	$(MKDIR) $(DESTDIR)$(docdir)/contrib
-	$(INSTALL) -m 644 contrib/README.md $(DESTDIR)$(docdir)/contrib
-	$(INSTALL) -m 755 contrib/*.sh $(DESTDIR)$(docdir)/contrib
-	$(INSTALL) -m 755 contrib/*.rb $(DESTDIR)$(docdir)/contrib
-	$(INSTALL) -m 755 contrib/*.pl $(DESTDIR)$(docdir)/contrib
-	$(INSTALL) -m 755 contrib/*.py $(DESTDIR)$(docdir)/contrib
-	$(MKDIR) $(DESTDIR)$(docdir)/contrib/colorschemes
-	$(INSTALL) -m 644 contrib/colorschemes/* $(DESTDIR)$(docdir)/contrib/colorschemes
-	$(MKDIR) $(DESTDIR)$(docdir)/contrib/getpocket.com
-	$(INSTALL) -m 755 contrib/getpocket.com/*.sh $(DESTDIR)$(docdir)/contrib/getpocket.com
-	$(INSTALL) -m 644 contrib/getpocket.com/*.md $(DESTDIR)$(docdir)/contrib/getpocket.com
-	$(MKDIR) $(DESTDIR)$(docdir)/contrib/image-preview
-	$(INSTALL) -m 755 contrib/image-preview/vifmimg $(DESTDIR)$(docdir)/contrib/image-preview
-	$(INSTALL) -m 755 contrib/image-preview/nbrun $(DESTDIR)$(docdir)/contrib/image-preview
-	$(INSTALL) -m 755 contrib/image-preview/nbparser $(DESTDIR)$(docdir)/contrib/image-preview
-	$(INSTALL) -m 644 contrib/image-preview/README.org $(DESTDIR)$(docdir)/contrib/image-preview
+	find contrib/ -type d -print0 | xargs -0 -I@ mkdir -p $(DESTDIR)$(docdir)/@
+	find contrib/ -type f -perm /0111 -print0 | xargs -0 -I@ install -m 755 @ $(DESTDIR)$(docdir)/@
+	find contrib/ -type f ! -perm /0111 -print0 | xargs -0 -I@ install -m 644 @ $(DESTDIR)$(docdir)/@
 	$(MKDIR) $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -m 644 doc/$(NEWSBOAT).1 $(DESTDIR)$(mandir)/man1
 	$(INSTALL) -m 644 doc/$(PODBOAT).1 $(DESTDIR)$(mandir)/man1
@@ -479,7 +470,7 @@ ci-check: test
 
 config: config.mk
 
-config.mk:
+config.mk: config.sh
 	@./config.sh
 
 xlicense.h: LICENSE

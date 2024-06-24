@@ -6,6 +6,7 @@
 #include <dlfcn.h>
 
 #include "fmtstrformatter.h"
+#include "logger.h"
 #include "rssfeed.h"
 #include "utils.h"
 

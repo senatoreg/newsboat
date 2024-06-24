@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cinttypes>
-#include <cstring>
 #include <thread>
 #include <time.h>
 
@@ -360,12 +359,6 @@ bool TtRssApi::update_article_flags(const std::string& oldflags,
 	}
 
 	return success;
-}
-
-rsspp::Feed TtRssApi::fetch_feed(const std::string& id)
-{
-	CurlHandle handle;
-	return fetch_feed(id, handle);
 }
 
 rsspp::Feed TtRssApi::fetch_feed(const std::string& id, CurlHandle& cached_handle)

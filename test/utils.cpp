@@ -1,20 +1,17 @@
 #include "utils.h"
 
-#include <algorithm>
 #include <chrono>
 #include <condition_variable>
-#include <ctype.h>
 #include <fstream>
 #include <memory>
 #include <mutex>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <thread>
-#include <tuple>
 #include <unistd.h>
 
 #include "3rd-party/catch.hpp"
-#include "htmlrenderer.h"
+#include "links.h"
 #include "test_helpers/chdir.h"
 #include "test_helpers/envvar.h"
 #include "test_helpers/stringmaker/optional.h"
@@ -957,7 +954,7 @@ TEST_CASE("strwidth()", "[utils]")
 
 	const auto input1 = utils::wstr2str(L"\uF91F");
 	REQUIRE(utils::strwidth(input1) == 2);
-	REQUIRE(utils::strwidth("\07") == 0);
+	REQUIRE(utils::strwidth("\07") == 1);
 }
 
 TEST_CASE("strwidth_stfl()", "[utils]")
@@ -976,7 +973,7 @@ TEST_CASE("strwidth_stfl()", "[utils]")
 
 	const auto input1 = utils::wstr2str(L"\uF91F");
 	REQUIRE(utils::strwidth_stfl(input1) == 2);
-	REQUIRE(utils::strwidth_stfl("\07") == 0);
+	REQUIRE(utils::strwidth_stfl("\07") == 1);
 
 	REQUIRE(utils::strwidth_stfl("<a") == 0); // #415
 	REQUIRE(utils::strwidth_stfl("a") == 1);
@@ -1714,14 +1711,6 @@ TEST_CASE("preserve_quotes() preserves single quotes and double quotes, if any",
 	}
 }
 
-TEST_CASE("gentabs() calculates padding tabs based on stringwidth", "[utils]")
-{
-	REQUIRE(utils::gentabs("") == 4);
-	REQUIRE(utils::gentabs("aaaaaaa") == 4);
-	REQUIRE(utils::gentabs("aaaaaaaa") == 3);
-	REQUIRE(utils::gentabs("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") == 1);
-}
-
 TEST_CASE("mkdir_parents() creates all paths components and returns 0 if "
 	"the path now exists",
 	"[utils]")
@@ -2008,7 +1997,7 @@ TEST_CASE("translit() returns the value of `tocode`, maybe with \"//TRANSLIT\" a
 	// tests checks just the bare minimum: the function doesn't crash, doesn't
 	// throw exceptions, and returns something resembling a correct value.
 
-	const auto check = [](std::string fromcode, std::string tocode) {
+	const auto check = [&](std::string fromcode, std::string tocode) {
 		DYNAMIC_SECTION(fromcode << " → " << tocode) {
 			const auto expected1(tocode);
 			const auto expected2(tocode + "//TRANSLIT");

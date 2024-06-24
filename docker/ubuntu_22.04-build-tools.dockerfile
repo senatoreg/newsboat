@@ -1,10 +1,10 @@
 # All the programs and libraries necessary to build Newsboat with newer
-# compilers. Contains GCC 12 and Rust 1.77.0 by default.
+# compilers. Contains GCC 12 and Rust 1.79.0 by default.
 #
 # Configurable via build-args:
 #
 # - cxx_package -- additional Ubuntu packages to install. Default: g++-12
-# - rust_version -- Rust version to install. Default: 1.77.0
+# - rust_version -- Rust version to install. Default: 1.79.0
 # - cc -- C compiler to use. This gets copied into CC environment variable.
 #       Default: gcc-12
 # - cxx -- C++ compiler to use. This gets copied into CXX environment variable.
@@ -13,6 +13,8 @@
 # Build with defaults:
 #
 #   docker build \
+#       --build-arg UID=$(id -u) \
+#       --build-arg GID=$(id -g) \
 #       --tag=newsboat-build-tools \
 #       --file=docker/ubuntu_22.04-build-tools.dockerfile \
 #       docker
@@ -20,6 +22,8 @@
 # Build with non-default compiler and Rust version:
 #
 #   docker build \
+#       --build-arg UID=$(id -u) \
+#       --build-arg GID=$(id -g) \
 #       --tag=newsboat-build-tools \
 #       --file=docker/ubuntu_22.04-build-tools.dockerfile \
 #       --build-arg cxx_package=clang-13 \
@@ -38,7 +42,6 @@
 #   docker run \
 #       --rm \
 #       --mount type=bind,source=$(pwd),target=/home/builder/src \
-#       --user $(id -u):$(id -g) \
 #       newsboat-build-tools \
 #       make
 #
@@ -74,8 +77,11 @@ RUN apt-get update \
     && apt-get autoremove \
     && apt-get clean
 
-RUN addgroup --gid 1000 builder \
-    && adduser --home /home/builder --uid 1000 --ingroup builder \
+ARG UID=1000
+ARG GID=1000
+
+RUN addgroup --gid $GID builder \
+    && adduser --home /home/builder --uid $UID --ingroup builder \
         --disabled-password --shell /bin/bash builder \
     && mkdir -p /home/builder/src \
     && chown -R builder:builder /home/builder
@@ -92,7 +98,7 @@ ENV LC_ALL en_US.UTF-8
 USER builder
 WORKDIR /home/builder/src
 
-ARG rust_version=1.77.0
+ARG rust_version=1.79.0
 
 RUN wget -O $HOME/rustup.sh --secure-protocol=TLSv1_2 https://sh.rustup.rs \
     && chmod +x $HOME/rustup.sh \

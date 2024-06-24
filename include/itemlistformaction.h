@@ -1,8 +1,6 @@
 #ifndef NEWSBOAT_ITEMLISTFORMACTION_H_
 #define NEWSBOAT_ITEMLISTFORMACTION_H_
 
-#include <assert.h>
-
 #include "3rd-party/optional.hpp"
 
 #include "configcontainer.h"
@@ -11,6 +9,7 @@
 #include "listformaction.h"
 #include "listformatter.h"
 #include "regexmanager.h"
+#include "stflrichtext.h"
 #include "view.h"
 
 namespace newsboat {
@@ -134,7 +133,7 @@ private:
 
 	void prepare_set_filterpos();
 
-	std::string item2formatted_line(const ItemPtrPosPair& item,
+	StflRichText item2formatted_line(const ItemPtrPosPair& item,
 		const unsigned int width,
 		const std::string& itemlist_format,
 		const std::string& datetime_format);

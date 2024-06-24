@@ -7,8 +7,8 @@
 #include "configcontainer.h"
 #include "file_system.h"
 #include "formaction.h"
-#include "listformatter.h"
 #include "listwidget.h"
+#include "stflrichtext.h"
 
 namespace newsboat {
 
@@ -41,7 +41,7 @@ private:
 	void add_directory(std::vector<file_system::FileSystemEntry>& id_at_position,
 		std::string dirname);
 	std::vector<file_system::FileSystemEntry> id_at_position;
-	std::vector<std::string> lines;
+	std::vector<StflRichText> lines;
 
 	std::string get_formatted_dirname(std::string dirname, mode_t mode);
 

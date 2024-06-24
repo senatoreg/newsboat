@@ -19,7 +19,6 @@ mod ffi {
         fn is_exec_url(url: &str) -> bool;
         fn is_valid_color(color: &str) -> bool;
         fn is_valid_attribute(attribute: &str) -> bool;
-        fn gentabs(string: &str) -> usize;
         fn run_command(cmd: &str, param: &str);
         fn strnaturalcmp(a: &str, b: &str) -> isize;
         fn strwidth(rs_str: &str) -> usize;
@@ -157,6 +156,9 @@ fn read_text_file(
     }
 }
 
+// Temporarily ignore clippy lint until PR is merged:
+// https://github.com/rust-lang/rust-clippy/pull/12756
+#[allow(clippy::assigning_clones)]
 fn extract_token_quoted(line: &mut String, delimiters: &str, token: &mut String) -> bool {
     let (token_opt, remainder) = utils::extract_token_quoted(line, delimiters);
     *line = remainder.to_owned();

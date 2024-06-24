@@ -2,13 +2,12 @@
 
 #include <algorithm>
 #include <cassert>
-#include <sstream>
 #include <string>
 
 #include "config.h"
 #include "controller.h"
 #include "fmtstrformatter.h"
-#include "listformatter.h"
+#include "stflrichtext.h"
 #include "strprintf.h"
 #include "utils.h"
 #include "view.h"
@@ -143,15 +142,15 @@ void SelectFormAction::prepare()
 		const auto selecttag_format = cfg->get_configvalue("selecttag-format");
 
 		std::uint32_t num_lines = 0;
-		std::function<std::string(std::uint32_t, std::uint32_t)> render_line;
+		std::function<StflRichText(std::uint32_t, std::uint32_t)> render_line;
 
 		switch (type) {
 		case SelectionType::TAG:
 			num_lines = tags.size();
 			render_line = [this, selecttag_format](std::uint32_t line,
-			std::uint32_t width) -> std::string {
+			std::uint32_t width) -> StflRichText {
 				const auto& tag = tags[line];
-				return utils::quote_for_stfl(
+				return StflRichText::from_plaintext(
 					format_line(selecttag_format,
 						tag,
 						line + 1,
@@ -160,10 +159,10 @@ void SelectFormAction::prepare()
 			break;
 		case SelectionType::FILTER:
 			num_lines = filters.size();
-			render_line = [this](std::uint32_t line, std::uint32_t width) -> std::string {
+			render_line = [this](std::uint32_t line, std::uint32_t width) -> StflRichText {
 				(void)width;
 				const auto& filter = filters[line];
-				return utils::quote_for_stfl(
+				return StflRichText::from_plaintext(
 					strprintf::fmt(
 						"%4u  %s",
 						line + 1,
