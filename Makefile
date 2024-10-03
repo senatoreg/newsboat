@@ -104,9 +104,11 @@ endif
 
 ifdef CARGO_BUILD_TARGET
 NEWSBOATLIB_OUTPUT=$(CARGO_TARGET_DIR)/$(CARGO_BUILD_TARGET)/$(BUILD_TYPE)/libnewsboat.a
+HTTPTESTSEVER_OUTPUT=$(CARGO_TARGET_DIR)/$(CARGO_BUILD_TARGET)/$(BUILD_TYPE)/http-test-server
 LDFLAGS+=-L$(CARGO_TARGET_DIR)/$(CARGO_BUILD_TARGET)/$(BUILD_TYPE)
 else
 NEWSBOATLIB_OUTPUT=$(CARGO_TARGET_DIR)/$(BUILD_TYPE)/libnewsboat.a
+HTTPTESTSEVER_OUTPUT=$(CARGO_TARGET_DIR)/$(BUILD_TYPE)/http-test-server
 LDFLAGS+=-L$(CARGO_TARGET_DIR)/$(BUILD_TYPE)
 endif
 
@@ -136,6 +138,9 @@ NB_DEPS=xlicense.h $(LIB_OUTPUT) $(FILTERLIB_OUTPUT) $(NEWSBOAT_OBJS) $(RSSPPLIB
 $(NEWSBOATLIB_OUTPUT): $(RUST_SRCS) Cargo.lock
 	+$(CARGO) build --package libnewsboat-ffi $(CARGO_BUILD_FLAGS)
 
+$(HTTPTESTSEVER_OUTPUT): $(RUST_SRCS) Cargo.lock
+	+$(CARGO) build --package http-test-server $(CARGO_BUILD_FLAGS)
+
 $(NEWSBOAT): $(NB_DEPS)
 	$(CXX) $(CXXFLAGS) -o $(NEWSBOAT) -Wl,--export-dynamic $(NEWSBOAT_OBJS) $(NEWSBOAT_LIBS) $(LDFLAGS)
 
@@ -160,7 +165,11 @@ $(FILTERLIB_OUTPUT): $(FILTERLIB_OBJS)
 src/plugins/%.so: src/plugins/%.o
 	$(CXX) $(CXXFLAGS) -shared -o $@ $<
 
-test: test/test rust-test
+HTTPTESTSERVER_RUN_LOCATION=test/http-test-server
+$(HTTPTESTSERVER_RUN_LOCATION): $(HTTPTESTSEVER_OUTPUT)
+	$(CP) $< $@
+
+test: test/test rust-test $(HTTPTESTSERVER_RUN_LOCATION)
 
 rust-test:
 	+$(CARGO) test $(CARGO_TEST_FLAGS) --no-run
@@ -230,6 +239,7 @@ clean-test:
 clean: clean-newsboat clean-podboat clean-libboat clean-libfilter clean-doc clean-mo clean-librsspp clean-libnewsboat clean-test
 	$(RM) $(STFL_HDRS) xlicense.h
 	$(RM) -r .deps
+	$(RM) $(HTTPTESTSERVER_RUN_LOCATION)
 
 profclean:
 	find . -name '*.gc*' -type f -print0 | xargs -0 $(RM) --

@@ -357,10 +357,7 @@ ConfigContainer::ConfigContainer(std::map<std::string, ConfigData> config_data_)
 {
 }
 
-ConfigContainer::~ConfigContainer()
-{
-	std::lock_guard<std::recursive_mutex> guard(config_data_mtx);
-}
+ConfigContainer::~ConfigContainer() = default;
 
 void ConfigContainer::register_commands(ConfigParser& cfgparser)
 {

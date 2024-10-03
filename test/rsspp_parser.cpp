@@ -1,8 +1,15 @@
 #include "rss/parser.h"
 
+#include <cstdint>
+
 #include "3rd-party/catch.hpp"
+#include "curlhandle.h"
 #include "rss/exception.h"
+#include "strprintf.h"
 #include "test_helpers/exceptionwithmsg.h"
+#include "test_helpers/httptestserver.h"
+#include "test_helpers/misc.h"
+#include "utils.h"
 
 TEST_CASE("Throws exception if file doesn't exist", "[rsspp::Parser]")
 {
@@ -91,6 +98,60 @@ TEST_CASE("Doesn't crash or garble data if an item in RSS 0.9x contains "
 
 	SECTION("RSS 0.94") {
 		REQUIRE_NOTHROW(f = p.parse_file("data/rss_094_with_empty_author.xml"));
+		REQUIRE(f.rss_version == rsspp::Feed::RSS_0_94);
+		check();
+	}
+}
+
+TEST_CASE("Doesn't crash or garble data if an item in RSS 0.9x contains "
+	"an author tag which ends with a bracket",
+	"[rsspp::Parser][issue2834]")
+{
+	rsspp::Parser p;
+	rsspp::Feed f;
+
+	const auto check = [&]() {
+		REQUIRE(f.title == "A Channel with Authors With Names Containing Brackets");
+		REQUIRE(f.description == "an example feed");
+		REQUIRE(f.link == "http://example.com/");
+		REQUIRE(f.language == "en");
+
+		REQUIRE(f.items.size() == 3u);
+
+		REQUIRE(f.items[0].title == "This one has an author name ending with a closing bracket");
+		REQUIRE(f.items[0].link == "http://example.com/test_1.html");
+		REQUIRE(f.items[0].description == "Non-empty description.");
+		REQUIRE(f.items[0].author == "Author name)");
+		REQUIRE(f.items[0].guid == "");
+
+		REQUIRE(f.items[1].title == "This one has an author name with an email in brackets");
+		REQUIRE(f.items[1].link == "http://example.com/test_2.html");
+		REQUIRE(f.items[1].description == "This is empty description (no).");
+		REQUIRE(f.items[1].author == "Author");
+		REQUIRE(f.items[1].guid == "");
+
+		REQUIRE(f.items[2].title ==
+			"This one has an author name with a non-email next in brackets");
+		REQUIRE(f.items[2].link == "http://example.com/test_3.html");
+		REQUIRE(f.items[2].description == "This is empty description (yes (no)).");
+		REQUIRE(f.items[2].author == "name");
+		REQUIRE(f.items[2].guid == "");
+	};
+
+	SECTION("RSS 0.91") {
+		REQUIRE_NOTHROW(f = p.parse_file("data/rss_091_with_bracket_author.xml"));
+		REQUIRE(f.rss_version == rsspp::Feed::RSS_0_91);
+		check();
+	}
+
+	SECTION("RSS 0.92") {
+		REQUIRE_NOTHROW(f = p.parse_file("data/rss_092_with_bracket_author.xml"));
+		REQUIRE(f.rss_version == rsspp::Feed::RSS_0_92);
+		check();
+	}
+
+	SECTION("RSS 0.94") {
+		REQUIRE_NOTHROW(f = p.parse_file("data/rss_094_with_bracket_author.xml"));
 		REQUIRE(f.rss_version == rsspp::Feed::RSS_0_94);
 		check();
 	}
@@ -377,4 +438,196 @@ TEST_CASE("Feed authors and source authors in atom feed", "[rsspp::Parser]")
 	REQUIRE(f.items[8].title == "Entry With Multiple Author And Source Authors");
 	REQUIRE(f.items[8].description == "Both entry authors should be used.");
 	REQUIRE(f.items[8].author == "Entry Author 1, Entry Author 2");
+}
+
+TEST_CASE("parse_url() extracts etag and lastmodified data", "[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	auto feed_xml = test_helpers::read_binary_file("data/atom10_1.xml");
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {
+		{"content-type", "text/xml"},
+		{"ETag", "returned-etag"},
+		{"Last-Modified", "Wed, 21 Oct 2015 07:28:00 GMT"},
+	}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	parser.parse_url(url, easyhandle);
+
+	REQUIRE(parser.get_etag() == "returned-etag");
+	REQUIRE(parser.get_last_modified() == 1445412480);
+}
+
+// Placeholders:
+// %s: encoding
+// %s: feed title
+constexpr auto atom_feed_with_encoding =
+	R"(<?xml version="1.0" encoding="%s"?>)"
+	R"(<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">)"
+	R"(<id>tag:example.com</id>)"
+	R"(<title type="text">%s</title>)"
+	R"(<updated>2008-12-30T18:26:15Z</updated>)"
+	R"(<entry>)"
+	R"(<id>tag:example.com,2008-12-30:/atom_testing</id>)"
+	R"(<title>regular title</title>)"
+	R"(<updated>2008-12-30T20:04:15Z</updated>)"
+	R"(</entry>)"
+	R"(</feed>)";
+
+TEST_CASE("parse_url() converts data if specified in xml encoding attribute",
+	"[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	constexpr auto title_utf8 = u8"タイトル"; // Japanese for "title"
+
+	auto feed_xml_utf8 = strprintf::fmt(atom_feed_with_encoding, "utf-16", title_utf8);
+
+	auto feed_xml_utf16 = utils::convert_text(feed_xml_utf8, "utf-16", "utf-8");
+	auto feed_xml = std::vector<std::uint8_t>(feed_xml_utf16.begin(), feed_xml_utf16.end());
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {
+		{"content-type", "text/xml"},
+	}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	auto parsed_feed = parser.parse_url(url, easyhandle);
+
+	REQUIRE(parsed_feed.items.size() == 1);
+	REQUIRE(parsed_feed.title == title_utf8);
+}
+
+TEST_CASE("parse_url() only converts once even when encoding specified twice (xml encoding and http header)",
+	"[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	constexpr auto title_utf8 = u8"Prøve"; // Danish for "test"
+
+	auto feed_xml_utf8 = strprintf::fmt(atom_feed_with_encoding, "iso-8859-1", title_utf8);
+
+	auto feed_xml_iso8859_1 = utils::convert_text(feed_xml_utf8, "iso-8859-1", "utf-8");
+	auto feed_xml = std::vector<std::uint8_t>(feed_xml_iso8859_1.begin(),
+			feed_xml_iso8859_1.end());
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {
+		{"content-type", "text/xml; charset=iso-8859-1"},
+	}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	auto parsed_feed = parser.parse_url(url, easyhandle);
+
+	REQUIRE(parsed_feed.items.size() == 1);
+	REQUIRE(parsed_feed.title == title_utf8);
+}
+
+TEST_CASE("parse_url() uses xml encoding if specified encodings conflict (xml encoding vs http header)",
+	"[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	constexpr auto title_utf8 = u8"Prøve"; // Danish for "test"
+
+	auto feed_xml_utf8 = strprintf::fmt(atom_feed_with_encoding, "iso-8859-1", title_utf8);
+
+	auto feed_xml_iso8859_1 = utils::convert_text(feed_xml_utf8, "iso-8859-1", "utf-8");
+	auto feed_xml = std::vector<std::uint8_t>(feed_xml_iso8859_1.begin(),
+			feed_xml_iso8859_1.end());
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {
+		{"content-type", "text/xml; charset=utf-16"}, // Expected to be ignored
+	}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	auto parsed_feed = parser.parse_url(url, easyhandle);
+
+	REQUIRE(parsed_feed.items.size() == 1);
+	REQUIRE(parsed_feed.title == title_utf8);
+}
+
+// Placeholders:
+// %s: feed title
+constexpr auto atom_feed_without_encoding =
+	R"(<?xml version="1.0"?>)"
+	R"(<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">)"
+	R"(<id>tag:example.com</id>)"
+	R"(<title type="text">%s</title>)"
+	R"(<updated>2008-12-30T18:26:15Z</updated>)"
+	R"(<entry>)"
+	R"(<id>tag:example.com,2008-12-30:/atom_testing</id>)"
+	R"(<title>regular title</title>)"
+	R"(<updated>2008-12-30T20:04:15Z</updated>)"
+	R"(</entry>)"
+	R"(</feed>)";
+
+TEST_CASE("parse_url() applies encoding specified in http header if no xml encoding specified",
+	"[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	constexpr auto title_utf8 = u8"Prøve"; // Danish for "test"
+
+	auto feed_xml_utf8 = strprintf::fmt(atom_feed_without_encoding, title_utf8);
+
+	auto feed_xml_iso8859_1 = utils::convert_text(feed_xml_utf8, "iso-8859-1", "utf-8");
+	auto feed_xml = std::vector<std::uint8_t>(feed_xml_iso8859_1.begin(),
+			feed_xml_iso8859_1.end());
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {
+		{"content-type", "text/xml; charset=iso-8859-1"},
+	}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	auto parsed_feed = parser.parse_url(url, easyhandle);
+
+	REQUIRE(parsed_feed.items.size() == 1);
+	REQUIRE(parsed_feed.title == title_utf8);
+}
+
+TEST_CASE("parse_url() assumes utf-8 if no encoding specified and replaces invalid code units",
+	"[rsspp::Parser]")
+{
+	using namespace newsboat;
+
+	constexpr auto title_utf8 = u8"Prøve"; // Danish for "test"
+	constexpr auto expected_title = u8"Pr�ve";
+
+	auto feed_xml_utf8 = strprintf::fmt(atom_feed_without_encoding, title_utf8);
+
+	auto feed_xml_iso8859_1 = utils::convert_text(feed_xml_utf8, "iso-8859-1", "utf-8");
+	auto feed_xml = std::vector<std::uint8_t>(feed_xml_iso8859_1.begin(),
+			feed_xml_iso8859_1.end());
+
+	auto& test_server = test_helpers::HttpTestServer::get_instance();
+	auto mock_registration = test_server.add_endpoint("/feed", {}, 200, {}, feed_xml);
+	const auto address = test_server.get_address();
+	const auto url = strprintf::fmt("http://%s/feed", address);
+
+	rsspp::Parser parser;
+	CurlHandle easyhandle;
+	auto parsed_feed = parser.parse_url(url, easyhandle);
+
+	REQUIRE(parsed_feed.items.size() == 1);
+	REQUIRE(parsed_feed.title == expected_title);
 }

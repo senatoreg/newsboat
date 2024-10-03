@@ -1,14 +1,17 @@
 #include "parser.h"
 
 #include <cinttypes>
+#include <cstdint>
 #include <cstring>
 #include <curl/curl.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
+#include "charencoding.h"
 #include "config.h"
 #include "curldatareceiver.h"
 #include "curlhandle.h"
+#include "curlheadercontainer.h"
 #include "exception.h"
 #include "logger.h"
 #include "remoteapi.h"
@@ -44,54 +47,6 @@ Parser::~Parser()
 	if (doc) {
 		xmlFreeDoc(doc);
 	}
-}
-
-struct HeaderValues {
-	time_t lastmodified;
-	std::string etag;
-
-	HeaderValues()
-		: lastmodified(0)
-	{
-	}
-};
-
-static size_t handle_headers(void* ptr, size_t size, size_t nmemb, void* data)
-{
-	char* header = new char[size * nmemb + 1];
-	HeaderValues* values = static_cast<HeaderValues*>(data);
-
-	memcpy(header, ptr, size * nmemb);
-	header[size * nmemb] = '\0';
-
-	if (!strncasecmp("Last-Modified:", header, 14)) {
-		time_t r = curl_getdate(header + 14, nullptr);
-		if (r == -1) {
-			LOG(Level::DEBUG,
-				"handle_headers: last-modified %s "
-				"(curl_getdate "
-				"FAILED)",
-				header + 14);
-		} else {
-			values->lastmodified =
-				curl_getdate(header + 14, nullptr);
-			LOG(Level::DEBUG,
-				"handle_headers: got last-modified %s (%" PRId64 ")",
-				header + 14,
-				// On GCC, `time_t` is `long int`, which is at least 32 bits.
-				// On x86_64, it's 64 bits. Thus, this cast is either a no-op,
-				// or an up-cast which is always safe.
-				static_cast<int64_t>(values->lastmodified));
-		}
-	} else if (!strncasecmp("ETag:", header, 5)) {
-		values->etag = std::string(header + 5);
-		utils::trim(values->etag);
-		LOG(Level::DEBUG, "handle_headers: got etag %s", values->etag);
-	}
-
-	delete[] header;
-
-	return size * nmemb;
 }
 
 Feed Parser::parse_url(const std::string& url,
@@ -146,9 +101,7 @@ Feed Parser::parse_url(const std::string& url,
 		curl_easy_setopt(easyhandle.ptr(), CURLOPT_CAINFO, curl_ca_bundle);
 	}
 
-	HeaderValues hdrs;
-	curl_easy_setopt(easyhandle.ptr(), CURLOPT_HEADERDATA, &hdrs);
-	curl_easy_setopt(easyhandle.ptr(), CURLOPT_HEADERFUNCTION, handle_headers);
+	auto curlHeaderHandler = CurlHeaderContainer::register_header_handler(easyhandle);
 	auto curlDataReceiver = CurlDataReceiver::register_data_handler(easyhandle);
 
 	if (lastmodified != 0) {
@@ -176,8 +129,41 @@ Feed Parser::parse_url(const std::string& url,
 
 	ret = curl_easy_perform(easyhandle.ptr());
 
-	lm = hdrs.lastmodified;
-	et = hdrs.etag;
+	const auto etag_headers = curlHeaderHandler->get_header_lines("ETag");
+	if (etag_headers.size() >= 1) {
+		std::string etag = etag_headers.back();
+		utils::trim(etag);
+		LOG(Level::DEBUG, "parse_url: got etag %s", etag);
+		et = etag;
+	}
+
+	const auto last_modified_headers = curlHeaderHandler->get_header_lines("Last-Modified");
+	if (last_modified_headers.size() >= 1) {
+		const std::string header_value = last_modified_headers.back();
+		time_t time = curl_getdate(header_value.c_str(), nullptr);
+		if (time == -1) {
+			LOG(Level::DEBUG, "parse_url: last-modified %s (curl_getdate FAILED)", header_value);
+		} else {
+			LOG(Level::DEBUG,
+				"parse_url: got last-modified %s (%" PRId64 ")",
+				header_value,
+				// On GCC, `time_t` is `long int`, which is at least 32 bits.
+				// On x86_64, it's 64 bits. Thus, this cast is either a no-op,
+				// or an up-cast which is always safe.
+				static_cast<int64_t>(time));
+			lm = time;
+		}
+	}
+
+	nonstd::optional<std::string> charset_content_type;
+	const auto content_type_headers = curlHeaderHandler->get_header_lines("Content-Type");
+	if (content_type_headers.size() >= 1) {
+		std::string header_value = content_type_headers.back();
+		utils::trim(header_value);
+		LOG(Level::DEBUG, "parse_url: got content type %s", header_value);
+		const auto input = std::vector<uint8_t>(header_value.begin(), header_value.end());
+		charset_content_type = charencoding::charset_from_content_type_header(input);
+	}
 
 	if (custom_headers) {
 		curl_easy_setopt(easyhandle.ptr(), CURLOPT_HTTPHEADER, 0);
@@ -220,30 +206,59 @@ Feed Parser::parse_url(const std::string& url,
 		}
 		throw Exception(msg);
 	}
+	if (infoOk == CURLE_OK && status == 304) {
+		throw NotModifiedException();
+	}
 
-	const std::string buf = curlDataReceiver->get_data();
+	std::string buf = curlDataReceiver->get_data();
 	LOG(Level::DEBUG,
 		"Parser::parse_url: retrieved data for %s: %s",
 		url,
 		buf);
 
+	const std::vector<std::uint8_t> data(buf.begin(), buf.end());
+	const auto charset_xml_declaration = charencoding::charset_from_xml_declaration(data);
+	const auto charset_bom = charencoding::charset_from_bom(data);
+
+	nonstd::optional<std::string> charset;
+	if (charset_bom.has_value()) {
+		charset = charset_bom;
+	} else if (charset_xml_declaration.has_value()) {
+		charset = charset_xml_declaration;
+	} else if (charset_content_type.has_value()) {
+		charset = charset_content_type;
+	} else {
+		buf = utils::string_from_utf8_lossy(data);
+		charset = "utf-8";
+	}
+
 	if (buf.length() > 0) {
 		LOG(Level::DEBUG,
 			"Parser::parse_url: handing over data to "
 			"parse_buffer()");
-		return parse_buffer(buf, url);
+		return parse_buffer(buf, url, charset);
 	}
 
 	return Feed();
 }
 
-Feed Parser::parse_buffer(const std::string& buffer, const std::string& url)
+Feed Parser::parse_buffer(const std::string& buffer, const std::string& url,
+	nonstd::optional<std::string> charset)
 {
-	doc = xmlReadMemory(buffer.c_str(),
-			buffer.length(),
-			url.c_str(),
-			nullptr,
-			XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
+	if (charset.has_value()) {
+		const auto buffer_utf8 = utils::convert_text(buffer, "utf-8", charset.value());
+		doc = xmlReadMemory(buffer_utf8.c_str(),
+				buffer_utf8.length(),
+				url.c_str(),
+				"UTF-8",
+				XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING | XML_PARSE_IGNORE_ENC);
+	} else {
+		doc = xmlReadMemory(buffer.c_str(),
+				buffer.length(),
+				url.c_str(),
+				nullptr,
+				XML_PARSE_RECOVER | XML_PARSE_NOERROR | XML_PARSE_NOWARNING);
+	}
 	if (doc == nullptr) {
 		throw Exception(_("could not parse buffer"));
 	}

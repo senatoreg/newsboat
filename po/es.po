@@ -2,8 +2,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: newsboat 2.5\n"
 "Report-Msgid-Bugs-To: https://github.com/newsboat/newsboat/issues\n"
-"POT-Creation-Date: 2024-06-08 14:53+0300\n"
-"PO-Revision-Date: 2023-09-16 10:50+0200\n"
+"POT-Creation-Date: 2024-09-09 19:36+0300\n"
+"PO-Revision-Date: 2024-09-15 22:18+0200\n"
 "Last-Translator: Roberto Michán Sánchez <robertoms258@gmail.com>\n"
 "Language-Team: ROOT <epsilon@correoe.no-ip.org>, OmeGa <omega@mailoo.org>, "
 "José Manuel García-Patos <josemanuel@gesaku.es>, Marcos Cruz "
@@ -13,7 +13,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 3.3.2\n"
+"X-Generator: Poedit 3.4.2\n"
 
 #: newsboat.cpp:34
 #, c-format
@@ -50,34 +50,28 @@ msgid "import OPML file"
 msgstr "importar archivo OPML"
 
 #: newsboat.cpp:57
-#, fuzzy
 msgid "read RSS feed URLs from <file>"
 msgstr "leer las URL de fuentes RSS desde <archivo>"
 
 #: newsboat.cpp:63
-#, fuzzy
 msgid "use <file> as cache file"
 msgstr "usar <archivo> como archivo de caché"
 
 #: newsboat.cpp:69 src/pbcontroller.cpp:353
-#, fuzzy
 msgid "read configuration from <file>"
 msgstr "leer configuración desde <archivo>"
 
 #: newsboat.cpp:75 src/pbcontroller.cpp:359
-#, fuzzy
 msgid "use <file> as podcast queue file"
-msgstr "usar <archivo> como archivo de cola"
+msgstr "usar <archivo> como archivo de cola de podcast"
 
 #: newsboat.cpp:81
-#, fuzzy
 msgid "save the input history of the search to <file>"
-msgstr "exportar lista de artículos leídos a <archivo>"
+msgstr "guardar el historial de búsqueda en <archivo>"
 
 #: newsboat.cpp:87
-#, fuzzy
 msgid "save the input history of the command line to <file>"
-msgstr "exportar lista de artículos leídos a <archivo>"
+msgstr "guardar el historial de comandos en <archivo>"
 
 #: newsboat.cpp:89
 msgid "compact the cache"
@@ -113,9 +107,8 @@ msgstr ""
 "depuración respectivamente)"
 
 #: newsboat.cpp:109 src/pbcontroller.cpp:379
-#, fuzzy
 msgid "use <file> as output log file"
-msgstr "usar <archivo> como archivo de salida del registro"
+msgstr "usar <archivo> como archivo de registro"
 
 #: newsboat.cpp:115
 msgid "export list of read articles to <file>"
@@ -155,18 +148,17 @@ msgstr "caché"
 #. i18n: This is printed out by --help before the path to the queue file
 #: newsboat.cpp:160
 msgid "podcast queue"
-msgstr ""
+msgstr "cola de podcast"
 
 #. i18n: This is printed out by --help before the path to the search history file
 #: newsboat.cpp:162
-#, fuzzy
 msgid "search history"
-msgstr "Buscar: "
+msgstr "historial de búsqueda"
 
 #. i18n: This is printed out by --help before the path to the cmdline history file
 #: newsboat.cpp:164
 msgid "command line history"
-msgstr ""
+msgstr "historial de comandos"
 
 #: newsboat.cpp:182 src/pbcontroller.cpp:409
 msgid ""
@@ -410,13 +402,12 @@ msgid "%s is inaccessible and can't be created\n"
 msgstr "%s es inaccesible y no se puede crear\n"
 
 #: src/controller.cpp:298
-#, fuzzy
 msgid ""
 "ERROR: You must set `feedbin-login` and one of `feedbin-password`, `feedbin-"
 "passwordfile` or `feedbin-passwordeval` to use Feedbin\n"
 msgstr ""
-"ERROR: Debes configurar `freshrss-login` y o bien `freshrss-password`, o "
-"`freshrss-passwordfile` o `freshrss-passwordeval` para usar FreshRSS\n"
+"ERROR: Debes configurar `feedbin-login` y o bien `feedbin-password`, o "
+"`feedbin-passwordfile` o `feedbin-passwordeval` para usar Feedbin\n"
 
 #: src/controller.cpp:310
 msgid "ERROR: You must set `freshrss-url` to use FreshRSS\n"
@@ -518,12 +509,11 @@ msgstr ""
 "hazlo e inténtalo de nuevo."
 
 #: src/controller.cpp:436
-#, fuzzy
 msgid ""
 "It looks like you haven't configured any feeds in your Feedbin account. "
 "Please do so, and try again."
 msgstr ""
-"Parece que no has configurado fuentes en tu cuenta de Miniflux. Por favor, "
+"Parece que no has configurado fuentes en tu cuenta de Feedbin. Por favor, "
 "hazlo e inténtalo de nuevo."
 
 #: src/controller.cpp:441
@@ -641,7 +631,7 @@ msgstr "Cerrar el diálogo"
 msgid "Error: you can't remove the feed list!"
 msgstr "Error: ¡No puedes eliminar la lista de fuentes!"
 
-#: src/dialogsformaction.cpp:122 src/feedlistformaction.cpp:1026
+#: src/dialogsformaction.cpp:122 src/feedlistformaction.cpp:1027
 #: src/itemlistformaction.cpp:1419 src/urlviewformaction.cpp:172
 msgid "Invalid position!"
 msgstr "¡Posición incorrecta!"
@@ -690,8 +680,8 @@ msgid "failed"
 msgstr "fallido"
 
 #: src/download.cpp:76
-msgid "incomplete"
-msgstr "incompleto"
+msgid "missing"
+msgstr "falta"
 
 #: src/download.cpp:78
 msgid "ready"
@@ -902,20 +892,20 @@ msgstr "Buscando..."
 msgid "Error while searching for `%s': %s"
 msgstr "Error al buscar `%s': %s"
 
-#: src/feedlistformaction.cpp:1010 src/itemlistformaction.cpp:999
+#: src/feedlistformaction.cpp:1011 src/itemlistformaction.cpp:999
 msgid "No results."
 msgstr "Sin resultados."
 
-#: src/feedlistformaction.cpp:1021 src/itemlistformaction.cpp:1414
+#: src/feedlistformaction.cpp:1022 src/itemlistformaction.cpp:1414
 msgid "Position not visible!"
 msgstr "¡Posición no visible!"
 
-#: src/feedlistformaction.cpp:1103
+#: src/feedlistformaction.cpp:1104
 #, c-format
 msgid "Feed List - %u unread, %u total"
 msgstr "Lista de fuentes - %u no leídas, %u en total"
 
-#: src/feedlistformaction.cpp:1117 src/itemlistformaction.cpp:1693
+#: src/feedlistformaction.cpp:1118 src/itemlistformaction.cpp:1693
 #, c-format
 msgid "Error: couldn't parse filter expression `%s': %s"
 msgstr "Error: no se pudo procesar la expresión de filtrado `%s': %s"
@@ -1707,9 +1697,8 @@ msgid "`%s' is not a valid key command"
 msgstr "`%s' no es un atajo de teclado válido"
 
 #: src/keymap.cpp:982
-#, fuzzy
 msgid "failed to parse binding"
-msgstr "No se pudo abrir el navegador"
+msgstr "fallo al interpretar el enlace"
 
 #: src/keymap.cpp:1014
 #, c-format
@@ -1777,12 +1766,11 @@ msgid ""
 "usage %s [-C <file>] [-q <file>] [-h]\n"
 msgstr ""
 "%s %s\n"
-"uso: %s [-C <file>] [-q <file>] [-h]\n"
+"uso: %s [-C <archivo>] [-q <archivo>] [-h]\n"
 
 #: src/pbcontroller.cpp:365
-#, fuzzy
 msgid "use <file> as lock file"
-msgstr "usar <archivo> como archivo de salida del registro"
+msgstr "usar <archivo> como archivo de bloqueo"
 
 #: src/pbcontroller.cpp:367
 msgid "start download on startup"
@@ -1877,7 +1865,7 @@ msgstr "%sCargando %s..."
 msgid "Error while retrieving %s: %s"
 msgstr "Error al descargar %s: %s"
 
-#: src/reloader.cpp:149
+#: src/reloader.cpp:152
 msgid "Error: invalid feed!"
 msgstr "Error: ¡Fuente incorrecta!"
 
@@ -1922,12 +1910,12 @@ msgstr "Guardar marcador"
 msgid "URLs"
 msgstr "URL"
 
-#: src/utils.cpp:733
+#: src/utils.cpp:758
 #, c-format
 msgid "Failed to open file: %s"
 msgstr "No se pudo abrir el archivo: %s"
 
-#: src/utils.cpp:737
+#: src/utils.cpp:762
 #, c-format
 msgid "Failed to read line %u: %s"
 msgstr "Error al leer la línea %u: %s"
@@ -1962,32 +1950,32 @@ msgstr "Actualizando la fuente de consulta..."
 msgid "Error: couldn't prepare query feed: %s"
 msgstr "Error: no se pudo preparar la fuente de consulta: %s"
 
-#: rss/atomparser.cpp:17 rss/parser.cpp:364 rss/rss09xparser.cpp:21
+#: rss/atomparser.cpp:17 rss/parser.cpp:379 rss/rss09xparser.cpp:21
 #: rss/rss10parser.cpp:18 rss/rss20parser.cpp:17
 msgid "XML root node is NULL"
 msgstr "El nodo raíz de XML es NULL"
 
-#: rss/parser.cpp:248
+#: rss/parser.cpp:263
 msgid "could not parse buffer"
 msgstr "no se pudo procesar el búfer"
 
-#: rss/parser.cpp:272
+#: rss/parser.cpp:287
 msgid "could not parse file"
 msgstr "no se pudo procesar el archivo"
 
-#: rss/parser.cpp:297
+#: rss/parser.cpp:312
 msgid "no RSS version"
 msgstr "sin versión de RSS"
 
-#: rss/parser.cpp:313
+#: rss/parser.cpp:328
 msgid "invalid RSS version"
 msgstr "versión de RSS incorrecta"
 
-#: rss/parser.cpp:334 rss/parser.cpp:345
+#: rss/parser.cpp:349 rss/parser.cpp:360
 msgid "invalid Atom version"
 msgstr "versión de Atom incorrecta"
 
-#: rss/parser.cpp:350
+#: rss/parser.cpp:365
 msgid "no Atom version"
 msgstr "sin versión de Atom"
 
