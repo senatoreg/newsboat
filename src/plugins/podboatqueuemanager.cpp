@@ -4,6 +4,7 @@
 #include <iostream>
 #include <libxml/uri.h>
 
+#include "logger.h"
 #include "configcontainer.h"
 #include "configdata.h"
 #include "fmtstrformatter.h"
