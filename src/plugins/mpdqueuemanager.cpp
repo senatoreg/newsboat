@@ -39,7 +39,7 @@ MPDQueueManager::MPDQueueManager()
 			"an exception occurred while parsing the configuration "
 			"file: %s",
 			ex.what());
-		std::cout << ex.what() << std::endl;
+		std::cerr << "ERROR:" << ex.what() << std::endl;
 	}
 }
 
@@ -50,19 +50,19 @@ void MPDQueueManager::deinit()
 	if (mpd_handle != NULL) {
 		int ret = dlclose(mpd_handle);
                 if (ret > 0) {
-			std::cout << "Unloading libmpdclient failed: " << dlerror() << "\n";
+			std::cerr << "ERROR: Unloading libmpdclient failed: " << dlerror() << "\n";
                 }
 	}
 }
 
 void MPDQueueManager::init()
 {
-	std::cout << "Setting up mpd...";
+	LOG(Level::INFO, "Loading MPD Queue Manager");
 
 	mpd_handle = dlopen("libmpdclient.so.2", RTLD_LAZY);
 
 	if (mpd_handle == nullptr) {
-		std::cout << dlerror() << "\n";
+		std::cerr << "ERROR:" << dlerror() << "\n";
 		return;
 	}
 
@@ -75,7 +75,7 @@ void MPDQueueManager::init()
 	mpd_connection_free_ = (mpd_connection_free_t) dlsym(mpd_handle, "mpd_connection_free");
 	mpd_connection_new_ = (mpd_connection_new_t) dlsym(mpd_handle, "mpd_connection_new");
 
-	std::cout << "done" << "\n";
+	LOG(Level::INFO, "MPD Queue Manager loaded");
 	return;
 }
 
