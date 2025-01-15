@@ -1,6 +1,6 @@
 [package]
 name = "libnewsboat"
-version = "2.37.0"
+version = "2.38.0"
 authors = ["Alexander Batischev <eual.jp@gmail.com>"]
 edition = "2021"
 
@@ -8,28 +8,28 @@ edition = "2021"
 strprintf = { path="../strprintf" }
 regex-rs = { path="../regex-rs" }
 
-fastrand = "2.1.1"
-url = "2.5.2"
+fastrand = "2.3.0"
+url = "2.5.4"
 percent-encoding = "2.3.1"
 xdg = "2.5.2"
 backtrace = "= 0.3"
-unicode-width = "0.1.13"
+unicode-width = "0.2.0"
 nom = "7"
 libc = "0.2"
 natord = "1.0.9"
 md5 = "0.7.0"
 lexopt = "0.3.0"
-chrono = "0.4.34"
+chrono = "0.4.39"
 unicode-segmentation = "1.12.0"
 
 [dependencies.gettext-rs]
-version = "0.7.1"
+version = "0.7.2"
 # Don't let the crate build its own copy of gettext; force it to use the one
 # built into glibc.
 features = [ "gettext-system" ]
 
 [dependencies.curl-sys]
-version = "0.4.75"
+version = "0.4.78"
 # This disables the only default feature, "ssl". It doesn't affect the
 # functionality, since it can't affect the libcurl.so available on the host.
 #

@@ -61,16 +61,15 @@ void QueueManager::deinit() {
 }
 
 /// Adds the podcast URL to Podboat's queue file
-EnqueueResult QueueManager::enqueue_url(std::shared_ptr<RssItem> item,
-			  std::shared_ptr<RssFeed> feed)
+EnqueueResult QueueManager::enqueue_url(RssItem& item, RssFeed& feed)
 {
 	return _queueManager->enqueue_url(item, feed);
 }
 
-EnqueueResult QueueManager::autoenqueue(std::shared_ptr<RssFeed> feed)
+EnqueueResult QueueManager::autoenqueue(RssFeed& feed)
 {
-	std::lock_guard<std::mutex> lock(feed->item_mutex);
-	for (const auto& item : feed->items()) {
+	std::lock_guard<std::mutex> lock(feed.item_mutex);
+	for (const auto& item : feed.items()) {
 		if (item->enqueued() || item->enclosure_url().empty()) {
 			continue;
 		}
@@ -92,7 +91,7 @@ EnqueueResult QueueManager::autoenqueue(std::shared_ptr<RssFeed> feed)
 			LOG(Level::INFO,
 				"QueueManager::autoenqueue: enqueuing `%s'",
 				item->enclosure_url());
-			const auto result = enqueue_url(item, feed);
+			const auto result = enqueue_url(*item, feed);
 			switch (result.status) {
 			case EnqueueStatus::QUEUED_SUCCESSFULLY:
 			case EnqueueStatus::URL_QUEUED_ALREADY:

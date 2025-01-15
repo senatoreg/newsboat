@@ -17,10 +17,12 @@ pub mod fmtstrformatter;
 pub mod fslock;
 pub mod history;
 pub mod human_panic;
+pub mod keycombination;
 pub mod keymap;
 pub mod logger;
 pub mod matchererror;
 pub mod scopemeasure;
+pub mod stflrichtext;
 pub mod utils;
 
 /// Runs a Rust function, and if it panics, calls abort(); otherwise returns what function

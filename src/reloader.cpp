@@ -117,7 +117,7 @@ void Reloader::reload(unsigned int pos,
 			sm.stopover("start replacing feed");
 			if (newfeed != nullptr) {
 				ctrl->replace_feed(
-					oldfeed, newfeed, pos, unattended);
+					*oldfeed, *newfeed, pos, unattended);
 				if (newfeed->total_item_count() == 0) {
 					LOG(Level::DEBUG,
 						"Reloader::reload: feed is empty");
@@ -263,8 +263,15 @@ void Reloader::reload_indexes_impl(std::vector<unsigned int> indexes, bool unatt
 				"Reloader::reload_indexes_impl: reloading feed #%u",
 				feed_index);
 			reload(feed_index, easyhandle, true, unattended);
+
 			// Reset any options set on the handle before next reload
 			curl_easy_reset(easyhandle.ptr());
+
+			// Restore cookiejar config to make sure option is active during curl_easy_cleanup()
+			const auto cookie_cache = cfg.get_configvalue("cookie-cache");
+			if (cookie_cache != "") {
+				curl_easy_setopt(easyhandle.ptr(), CURLOPT_COOKIEJAR, cookie_cache.c_str());
+			}
 		}
 	}, indexes.size());
 }

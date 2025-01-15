@@ -839,7 +839,7 @@ bool ItemListFormAction::process_operation(Operation op,
 	case OP_ENQUEUE:
 		if (!visible_items.empty() && itempos < visible_items.size()) {
 			const auto item = visible_items[itempos].first;
-			return enqueue_item_enclosure(item, feed, v, *rsscache);
+			return enqueue_item_enclosure(*item, *feed, v, *rsscache);
 		} else {
 			v.get_statusline().show_error(_("No item selected!"));
 			return false;
@@ -928,7 +928,7 @@ void ItemListFormAction::finished_qna(Operation op)
 			std::string cmd = qna_responses[0];
 			std::ostringstream ostr;
 			v.get_ctrl()->write_item(
-				visible_items[itempos].first, ostr);
+				*visible_items[itempos].first, ostr);
 			v.push_empty_formaction();
 			Stfl::reset();
 			FILE* f = popen(cmd.c_str(), "w");
@@ -1088,6 +1088,8 @@ void ItemListFormAction::draw_items()
 
 void ItemListFormAction::prepare()
 {
+	set_keymap_hints();
+
 	std::lock_guard<std::mutex> mtx(redraw_mtx);
 
 	const auto sort_strategy = cfg->get_article_sort_strategy();
@@ -1226,7 +1228,6 @@ void ItemListFormAction::init()
 	recalculate_widget_dimensions();
 	list.set_position(0);
 	set_status("");
-	set_keymap_hints();
 	invalidate_list();
 	do_update_visible_items();
 	draw_items();
@@ -1391,17 +1392,20 @@ std::string ItemListFormAction::get_guid()
 	return visible_items[itempos].first->guid();
 }
 
-const std::vector<KeyMapHintEntry>& ItemListFormAction::get_keymap_hint() const
+std::vector<KeyMapHintEntry> ItemListFormAction::get_keymap_hint() const
 {
-	static const std::vector<KeyMapHintEntry> hints = {{OP_QUIT, _("Quit")},
-		{OP_OPEN, _("Open")},
-		{OP_SAVE, _("Save")},
-		{OP_RELOAD, _("Reload")},
-		{OP_NEXTUNREAD, _("Next Unread")},
-		{OP_MARKFEEDREAD, _("Mark All Read")},
-		{OP_SEARCH, _("Search")},
-		{OP_HELP, _("Help")}
-	};
+	std::vector<KeyMapHintEntry> hints;
+	if (filter_active) {
+		hints.push_back({OP_CLEARFILTER, _("Clear filter")});
+	}
+	hints.push_back({OP_QUIT, _("Quit")});
+	hints.push_back({OP_OPEN, _("Open")});
+	hints.push_back({OP_SAVE, _("Save")});
+	hints.push_back({OP_RELOAD, _("Reload")});
+	hints.push_back({OP_NEXTUNREAD, _("Next Unread")});
+	hints.push_back({OP_MARKFEEDREAD, _("Mark All Read")});
+	hints.push_back({OP_SEARCH, _("Search")});
+	hints.push_back({OP_HELP, _("Help")});
 	return hints;
 }
 
@@ -1473,7 +1477,7 @@ void ItemListFormAction::save_article(const nonstd::optional<std::string>& filen
 		v.get_statusline().show_error(_("Aborted saving."));
 	} else {
 		try {
-			v.get_ctrl()->write_item(item, filename.value());
+			v.get_ctrl()->write_item(*item, filename.value());
 			v.get_statusline().show_message(strprintf::fmt(
 					_("Saved article to %s"), filename.value()));
 		} catch (...) {

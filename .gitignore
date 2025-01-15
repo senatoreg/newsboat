@@ -39,3 +39,4 @@ doc/podboat-cmds-linked.asciidoc
 .cargo_home/
 compile_commands.json
 /compile_flags.txt
+*.profraw

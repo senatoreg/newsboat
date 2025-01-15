@@ -1,7 +1,6 @@
 #ifndef NEWSBOAT_QUEUEMANAGER_H_
 #define NEWSBOAT_QUEUEMANAGER_H_
 
-#include <memory>
 #include <string>
 
 namespace newsboat {
@@ -41,11 +40,13 @@ public:
 	virtual void deinit();
 
 	/// Adds the podcast URL to Podboat's queue file
-	virtual EnqueueResult enqueue_url(std::shared_ptr<RssItem> item,
-					  std::shared_ptr<RssFeed> feed);
+	EnqueueResult enqueue_url(RssItem& item, RssFeed& feed);
 
 	/// Add all HTTP and HTTPS enclosures to the queue file
-	EnqueueResult autoenqueue(std::shared_ptr<RssFeed> feed);
+	EnqueueResult autoenqueue(RssFeed& feed);
+
+private:
+	std::string generate_enqueue_filename(RssItem& item, RssFeed& feed);
 };
 
 }

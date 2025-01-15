@@ -33,7 +33,7 @@ public:
 		feed = fd;
 	}
 	void set_highlightphrase(const std::string& text);
-	const std::vector<KeyMapHintEntry>& get_keymap_hint() const override;
+	std::vector<KeyMapHintEntry> get_keymap_hint() const override;
 	void handle_cmdline(const std::string& cmd) override;
 
 	std::string id() const override
@@ -68,7 +68,7 @@ private:
 	bool open_link_in_browser(const std::string& link, const std::string& type,
 		const std::string& title, bool interactive) const;
 
-	void update_head(const std::shared_ptr<RssItem>& item);
+	void update_head(RssItem& item);
 	void set_head(const std::string& s,
 		const std::string& feedtitle,
 		unsigned int unread,

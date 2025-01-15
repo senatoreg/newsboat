@@ -2,9 +2,11 @@
 
 #include <cinttypes>
 #include <curl/curl.h>
+#include <iostream>
 #include <thread>
 
 #include "3rd-party/json.hpp"
+#include "config.h"
 #include "curlhandle.h"
 #include "logger.h"
 #include "remoteapi.h"
@@ -43,10 +45,19 @@ bool MinifluxApi::authenticate()
 
 	CurlHandle handle;
 	long response_code = 0;
-	run_op("/v1/me", json(), handle);
+	const std::string path = "/v1/me";
+	run_op(path, json(), handle);
 	curl_easy_getinfo(handle.ptr(), CURLINFO_RESPONSE_CODE, &response_code);
 
 	if (response_code == 401) {
+		return false;
+	}
+	if (response_code < 200 || response_code > 299) {
+		const auto url = server + path;
+		std::cerr << strprintf::fmt(
+				_("Authentication check using %s failed (HTTP response code: %s)"),
+				url,
+				std::to_string(response_code)) << std::endl;
 		return false;
 	}
 
@@ -222,6 +233,17 @@ rsspp::Feed MinifluxApi::fetch_feed(const std::string& id, CurlHandle& cached_ha
 
 			if (!entry["content"].is_null()) {
 				item.content_encoded = entry["content"];
+			}
+
+			if (!entry["enclosures"].is_null() && entry["enclosures"].is_array()) {
+				for (const auto& enclosure : entry["enclosures"]) {
+					if (!enclosure["url"].is_null() && !enclosure["mime_type"].is_null()) {
+						rsspp::Enclosure enc;
+						enc.url = enclosure["url"];
+						enc.type = enclosure["mime_type"];
+						item.enclosures.push_back(enc);
+					}
+				}
 			}
 
 			const int entry_id = entry["id"];
