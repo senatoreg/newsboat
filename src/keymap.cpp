@@ -1,5 +1,7 @@
 #include "keymap.h"
 
+#include <algorithm>
+#include <iterator>
 #include <map>
 #include <string>
 #include <vector>
@@ -49,7 +51,7 @@ namespace newsboat {
 struct OpDesc {
 	const Operation op;
 	const std::string opstr;
-	const KeyCombination default_key;
+	const nonstd::optional<KeyCombination> default_key;
 	const std::string help_text;
 	const unsigned short flags;
 };
@@ -119,7 +121,7 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_MARKALLABOVEASREAD,
 		"mark-all-above-as-read",
-		KeyCombination(""),
+		{},
 		translatable("Mark all above as read"),
 		KM_ARTICLELIST | KM_SEARCHRESULTSLIST
 	},
@@ -133,7 +135,7 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_SAVEALL,
 		"save-all",
-		KeyCombination(""),
+		{},
 		translatable("Save articles"),
 		KM_ARTICLELIST | KM_SEARCHRESULTSLIST
 	},
@@ -182,14 +184,14 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_OPENALLUNREADINBROWSER,
 		"open-all-unread-in-browser",
-		KeyCombination(""),
+		{},
 		translatable("Open all unread items of selected feed in browser"),
 		KM_FEEDLIST | KM_ARTICLELIST | KM_SEARCHRESULTSLIST
 	},
 	{
 		OP_OPENALLUNREADINBROWSER_AND_MARK,
 		"open-all-unread-in-browser-and-mark-read",
-		KeyCombination(""),
+		{},
 		translatable("Open all unread items of selected feed in browser and mark "
 			"read"),
 		KM_FEEDLIST | KM_ARTICLELIST | KM_SEARCHRESULTSLIST
@@ -204,7 +206,7 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_OPENINBROWSER_NONINTERACTIVE,
 		"open-in-browser-noninteractively",
-		KeyCombination(""),
+		{},
 		translatable("Open URL of article, feed, or entry in a browser, non-interactively"),
 		KM_FEEDLIST | KM_ARTICLELIST | KM_SEARCHRESULTSLIST | KM_ARTICLE | KM_URLVIEW
 	},
@@ -281,7 +283,7 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_GOTO_TITLE,
 		"goto-title",
-		KeyCombination(""),
+		{},
 		translatable("Goto item with title"),
 		KM_FEEDLIST | KM_ARTICLELIST | KM_SEARCHRESULTSLIST
 	},
@@ -534,7 +536,7 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_ARTICLEFEED,
 		"article-feed",
-		KeyCombination(""),
+		{},
 		translatable("Go to the feed of the article"),
 		KM_ARTICLE | KM_ARTICLELIST | KM_SEARCHRESULTSLIST
 	},
@@ -705,14 +707,14 @@ static const std::vector<OpDesc> opdescs = {
 	{
 		OP_SK_HALF_PAGE_UP,
 		"halfpageup",
-		KeyCombination(""),
+		{},
 		translatable("Move half page up"),
 		KM_SYSKEYS
 	},
 	{
 		OP_SK_HALF_PAGE_DOWN,
 		"halfpagedown",
-		KeyCombination(""),
+		{},
 		translatable("Move half page down"),
 		KM_SYSKEYS
 	},
@@ -733,17 +735,9 @@ static const std::vector<OpDesc> opdescs = {
 	},
 
 	{
-		OP_INT_SET,
+		OP_SET,
 		"set",
-		KeyCombination("internal-set"),
-		"",
-		KM_INTERNAL
-	},
-
-	{
-		OP_INT_GOTO_URL,
-		"gotourl",
-		KeyCombination("internal-goto-url"),
+		{},
 		"",
 		KM_INTERNAL
 	},
@@ -777,7 +771,7 @@ KeyMap::KeyMap(unsigned flags)
 		}
 
 		// Skip operations without a default key
-		if (op_desc.default_key.get_key().empty()) {
+		if (!op_desc.default_key.has_value()) {
 			continue;
 		}
 
@@ -786,15 +780,135 @@ KeyMap::KeyMap(unsigned flags)
 			const std::uint32_t context_flag = ctx.second;
 			if ((op_desc.flags & (context_flag | KM_INTERNAL | KM_SYSKEYS))) {
 				const auto& default_key = op_desc.default_key;
-				keymap_[context][default_key] = op_desc.op;
+				apply_bindkey(context_keymaps[context], default_key.value(), op_desc.op);
 			}
 		}
 	}
 
-	keymap_["help"][KeyCombination("b")] = OP_SK_PGUP;
-	keymap_["help"][KeyCombination("SPACE")] = OP_SK_PGDOWN;
-	keymap_["article"][KeyCombination("b")] = OP_SK_PGUP;
-	keymap_["article"][KeyCombination("SPACE")] = OP_SK_PGDOWN;
+	apply_bindkey(context_keymaps["help"], KeyCombination("b"), OP_SK_PGUP);
+	apply_bindkey(context_keymaps["help"], KeyCombination("SPACE"), OP_SK_PGDOWN);
+	apply_bindkey(context_keymaps["article"], KeyCombination("b"), OP_SK_PGUP);
+	apply_bindkey(context_keymaps["article"], KeyCombination("SPACE"), OP_SK_PGDOWN);
+}
+
+HelpInfo KeyMap::get_help_info(std::string context)
+{
+	const auto& bindings = context_keymaps.at(context);
+	std::set<Operation> unused_actions;
+	for (const auto& desc : opdescs) {
+		if (!(desc.flags & get_flag_from_context(context))) {
+			// Ignore operation if it is not valid in this context
+			continue;
+		}
+		unused_actions.insert(desc.op);
+	}
+
+	auto help_info_bindings = get_help_info_bindings(unused_actions, bindings);
+	std::stable_sort(
+		help_info_bindings.begin(),
+		help_info_bindings.end(),
+	[](const HelpBindInfo& a, const HelpBindInfo& b) {
+		return a.op_order_pos < b.op_order_pos;
+	});
+
+	std::vector<UnboundAction> unbound_actions;
+	for (const auto& desc : opdescs) {
+		if (unused_actions.count(desc.op) > 0) {
+			unbound_actions.push_back({
+				desc.opstr,
+				_(desc.help_text.c_str()),
+			});
+		}
+	}
+
+	return HelpInfo {
+		help_info_bindings,
+		unbound_actions,
+		get_help_info_macros(),
+	};
+}
+
+std::vector<HelpBindInfo> KeyMap::get_help_info_bindings(std::set<Operation>&
+	unused_actions, const Mapping& mapping,
+	const std::string& key_sequence_prefix)
+{
+	std::vector<HelpBindInfo> help_info;
+	if (mapping.is_leaf_node) {
+		const auto& action = mapping.action;
+		nonstd::optional<std::string> action_str;
+		std::size_t order_pos = opdescs.size();
+		std::string description;
+		if (action.cmds.size() == 1 && action.cmds.front().args.empty()) {
+			const auto it = std::find_if(opdescs.begin(), opdescs.end(), [&](const OpDesc& desc) {
+				return desc.op == action.cmds.front().op;
+			});
+			if (it != opdescs.end()) {
+				action_str = it->opstr;
+				order_pos = std::distance(opdescs.begin(), it);
+				description = _(it->help_text.c_str());
+			}
+		}
+		if (!action.description.empty()) {
+			description = action.description;
+		}
+		if (description.empty()) {
+			description = describe_actions(action.cmds);
+		}
+		help_info.push_back(HelpBindInfo{ key_sequence_prefix, action_str, order_pos, description});
+
+		for (const auto& cmd : action.cmds) {
+			unused_actions.erase(cmd.op);
+		}
+	} else {
+		for (const auto& continuation : mapping.continuations) {
+			const auto key_combination = continuation.first;
+			const auto recursive_help_info = get_help_info_bindings(unused_actions,
+					continuation.second,
+					key_sequence_prefix + key_combination.to_bind_string());
+			help_info.insert(help_info.end(), recursive_help_info.begin(), recursive_help_info.end());
+		}
+	}
+	return help_info;
+}
+
+std::vector<HelpMacroInfo> KeyMap::get_help_info_macros()
+{
+	std::vector<HelpMacroInfo> help_info;
+	for (const auto& macro : macros_) {
+		// "macro-prefix" is not translated because it refers to an operation name
+		const std::string key_sequence = "<macro-prefix>" + macro.first.to_bind_string();
+		help_info.push_back(HelpMacroInfo {
+			key_sequence,
+			macro.second.description,
+		});
+	}
+	return help_info;
+}
+
+std::string KeyMap::describe_actions(const std::vector<MacroCmd>& cmds)
+{
+	bool first = true;
+	std::string description;
+	for (const auto& cmd : cmds) {
+		if (!first) {
+			description += "; ";
+		}
+		const auto it = std::find_if(opdescs.begin(), opdescs.end(), [&](const OpDesc& desc) {
+			return desc.op == cmd.op;
+		});
+		if (it != opdescs.end()) {
+			description += it->opstr;
+		} else {
+			// Shouldn't be possible given the way we register key bindings
+			description += "<?>";
+		}
+		for (const auto& arg : cmd.args) {
+			description += " ";
+			description += utils::quote_if_necessary(arg);
+		}
+		first = false;
+	}
+	return description;
 }
 
 std::vector<KeyMapDesc> KeyMap::get_keymap_descriptions(std::string context)
@@ -807,9 +921,17 @@ std::vector<KeyMapDesc> KeyMap::get_keymap_descriptions(std::string context)
 		}
 
 		bool bound_to_key = false;
-		for (const auto& keymap : keymap_[context]) {
+		for (const auto& keymap : context_keymaps[context].continuations) {
 			const auto& key = keymap.first;
-			const Operation op = keymap.second;
+			auto& mapping = keymap.second;
+			if (!mapping.is_leaf_node) {
+				continue;
+			}
+			auto& cmds = mapping.action.cmds;
+			if (cmds.size() != 1) {
+				continue;
+			}
+			const Operation op = cmds.front().op;
 			if (opdesc.op == op) {
 				descs.push_back({key, opdesc.opstr, _(opdesc.help_text.c_str()), context, opdesc.flags});
 				bound_to_key = true;
@@ -826,11 +948,6 @@ std::vector<KeyMapDesc> KeyMap::get_keymap_descriptions(std::string context)
 	return descs;
 }
 
-const std::map<KeyCombination, MacroBinding>& KeyMap::get_macro_descriptions()
-{
-	return macros_;
-}
-
 KeyMap::~KeyMap() {}
 
 void KeyMap::set_key(Operation op,
@@ -840,10 +957,10 @@ void KeyMap::set_key(Operation op,
 	LOG(Level::DEBUG, "KeyMap::set_key(%d,%s) called", op, key.to_bindkey_string());
 	if (context == "all") {
 		for (const auto& ctx : contexts) {
-			keymap_[ctx.first][key] = op;
+			apply_bindkey(context_keymaps[ctx.first], key, op);
 		}
 	} else {
-		keymap_[context][key] = op;
+		apply_bindkey(context_keymaps[context], key, op);
 	}
 }
 
@@ -852,10 +969,10 @@ void KeyMap::unset_key(const KeyCombination& key, const std::string& context)
 	LOG(Level::DEBUG, "KeyMap::unset_key(%s) called", key.to_bindkey_string());
 	if (context == "all") {
 		for (const auto& ctx : contexts) {
-			keymap_[ctx.first][key] = OP_NIL;
+			context_keymaps[ctx.first].continuations.erase(key);
 		}
 	} else {
-		keymap_[context][key] = OP_NIL;
+		context_keymaps[context].continuations.erase(key);
 	}
 }
 
@@ -865,10 +982,10 @@ void KeyMap::unset_all_keys(const std::string& context)
 	auto internal_ops_only = get_internal_operations();
 	if (context == "all") {
 		for (const auto& ctx : contexts) {
-			keymap_[ctx.first] = internal_ops_only;
+			context_keymaps[ctx.first] = internal_ops_only;
 		}
 	} else {
-		keymap_[context] = std::move(internal_ops_only);
+		context_keymaps[context] = std::move(internal_ops_only);
 	}
 }
 
@@ -897,32 +1014,61 @@ char KeyMap::get_key(const std::string& keycode)
 	return 0;
 }
 
-Operation KeyMap::get_operation(const KeyCombination& key_combination,
-	const std::string& context)
+std::vector<MacroCmd> KeyMap::get_operation(const std::vector<KeyCombination>&
+	key_sequence, const std::string& context, MultiKeyBindingState& state, BindingType& type)
 {
-	std::string key;
-	LOG(Level::DEBUG,
-		"KeyMap::get_operation: keycode = %s context = %s",
-		key_combination.to_bindkey_string(),
-		context);
-	return keymap_[context][key_combination];
+	return get_operation(context_keymaps[context], key_sequence, state, type);
+}
+
+std::vector<MacroCmd> KeyMap::get_operation(const Mapping& mapping,
+	const std::vector<KeyCombination>& key_sequence, MultiKeyBindingState& state,
+	BindingType& type)
+{
+	if (key_sequence.empty()) {
+		if (mapping.is_leaf_node) {
+			state = MultiKeyBindingState::Found;
+			type = mapping.binding_type;
+			return mapping.action.cmds;
+		} else {
+			state = MultiKeyBindingState::MoreInputNeeded;
+			return {};
+		}
+	} else {
+		const auto key_combination = key_sequence.front();
+		const auto remainder_key_sequence = std::vector<KeyCombination>(std::next(
+					key_sequence.begin()), key_sequence.end());
+		if (mapping.is_leaf_node || mapping.continuations.count(key_combination) == 0) {
+			state = MultiKeyBindingState::NotFound;
+			return {};
+		} else {
+			return get_operation(mapping.continuations.at(key_combination), remainder_key_sequence,
+					state, type);
+		}
+	}
 }
 
 void KeyMap::dump_config(std::vector<std::string>& config_output) const
 {
 	for (const auto& ctx : contexts) {
 		const std::string& context = ctx.first;
-		const auto& x = keymap_.at(context);
-		for (const auto& keymap : x) {
-			if (keymap.second < OP_INT_MIN) {
-				std::string configline = "bind-key ";
-				configline.append(utils::quote(keymap.first.to_bindkey_string()));
-				configline.append(" ");
-				configline.append(getopname(keymap.second));
-				configline.append(" ");
-				configline.append(context);
-				config_output.push_back(configline);
+		const auto& x = context_keymaps.at(context);
+		for (const auto& keymap : x.continuations) {
+			const auto& mapping = keymap.second;
+			if (!mapping.is_leaf_node) {
+				continue;
 			}
+			auto& cmds = mapping.action.cmds;
+			if (cmds.size() != 1) {
+				continue;
+			}
+			auto op = cmds.front().op;
+			std::string configline = "bind-key ";
+			configline.append(utils::quote(keymap.first.to_bindkey_string()));
+			configline.append(" ");
+			configline.append(getopname(op));
+			configline.append(" ");
+			configline.append(context);
+			config_output.push_back(configline);
 		}
 	}
 	for (const auto& macro : macros_) {
@@ -1021,13 +1167,17 @@ void KeyMap::handle_action(const std::string& action, const std::string& params)
 			}
 		}
 		const auto key_sequence = KeyCombination::from_bind(std::string(binding.key_sequence));
+		LOG(Level::DEBUG, "New binding with key sequence:");
+		for (const auto& key : key_sequence) {
+			LOG(Level::DEBUG, "- %s (%s)", key.to_bind_string(), key.get_key());
+		}
 		const auto description = std::string(binding.description);
 		const auto cmds = convert_operations(binding.operations);
 		for (const auto& context : bind_contexts) {
 			if (contexts.count(context) == 0) {
 				throw ConfigHandlerException(strprintf::fmt(_("unknown context: %s"), context));
 			}
-			apply_bind(context_keymaps[context], key_sequence, cmds, description);
+			apply_bind(context_keymaps[context], key_sequence, cmds, description, BindingType::Bind);
 		}
 	} else if (action == "macro") {
 		std::string remaining_params = params;
@@ -1049,10 +1199,11 @@ void KeyMap::handle_action(const std::string& action, const std::string& params)
 }
 
 void KeyMap::apply_bind(Mapping& target, const std::vector<KeyCombination> key_sequence,
-	const std::vector<MacroCmd>& cmds, const std::string& description)
+	const std::vector<MacroCmd>& cmds, const std::string& description, BindingType type)
 {
 	if (key_sequence.size() == 0) {
 		target.is_leaf_node = true;
+		target.binding_type = type;
 		target.continuations.clear();
 		target.action = MacroBinding { cmds, description };
 	} else {
@@ -1065,8 +1216,24 @@ void KeyMap::apply_bind(Mapping& target, const std::vector<KeyCombination> key_s
 			target.continuations[key_combination],
 			remainder_key_sequence,
 			cmds,
-			description);
+			description,
+			type);
 	}
+}
+
+void KeyMap::apply_bindkey(Mapping& target, const KeyCombination& key_combination,
+	Operation op)
+{
+	const auto cmds = std::vector<MacroCmd> {
+		{op, {}},
+	};
+	const std::string description = "";
+	apply_bind(
+		target,
+	{key_combination},
+	cmds,
+	description,
+	BindingType::BindKey);
 }
 
 ParsedOperations KeyMap::parse_operation_sequence(const std::string& line,
@@ -1098,8 +1265,16 @@ std::vector<KeyCombination> KeyMap::get_keys(Operation op,
 	const std::string& context)
 {
 	std::vector<KeyCombination> keys;
-	for (const auto& keymap : keymap_[context]) {
-		if (keymap.second == op) {
+	for (const auto& keymap : context_keymaps[context].continuations) {
+		const auto& mapping = keymap.second;
+		if (!mapping.is_leaf_node) {
+			continue;
+		}
+		auto& cmds = mapping.action.cmds;
+		if (cmds.size() != 1) {
+			continue;
+		}
+		if (cmds.front().op == op) {
 			keys.push_back(keymap.first);
 		}
 	}
@@ -1127,13 +1302,23 @@ bool KeyMap::is_valid_context(const std::string& context)
 	return false;
 }
 
-std::map<KeyCombination, Operation> KeyMap::get_internal_operations() const
+Mapping KeyMap::get_internal_operations() const
 {
-	std::map<KeyCombination, Operation> internal_ops;
+	Mapping internal_ops;
 	for (const auto& opdesc : opdescs) {
 		if (opdesc.flags & KM_INTERNAL) {
-			const auto& default_key = opdesc.default_key;
-			internal_ops[default_key] = opdesc.op;
+			if (!opdesc.default_key.has_value()) {
+				continue;
+			}
+			const auto& default_key = opdesc.default_key.value();
+			const std::string description = "";
+			const MacroBinding action {
+				{ MacroCmd { opdesc.op, {} } },
+				description,
+			};
+			internal_ops.continuations[default_key].is_leaf_node = true;
+			internal_ops.continuations[default_key].binding_type = BindingType::BindKey;
+			internal_ops.continuations[default_key].action = action;
 		}
 	}
 	return internal_ops;

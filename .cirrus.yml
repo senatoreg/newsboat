@@ -5,9 +5,9 @@ freebsd_resource_settings: &freebsd_resource_settings
 task:
     skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/*', 'docker/**/*', '.github/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
     matrix:
-        - name: FreeBSD 13.4
+        - name: FreeBSD 13.5
           freebsd_instance:
-            image: freebsd-13-4-release-amd64
+            image: freebsd-13-5-release-amd64
             << : *freebsd_resource_settings
         - name: FreeBSD 14.2
           freebsd_instance:
@@ -73,7 +73,7 @@ task:
 
 task:
     name: Linux i686 (Ubuntu 18.04)
-    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/remote-testing/*', 'docker/remote-testing/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
     container:
         greedy: true
         dockerfile: docker/ubuntu_18.04-i686.dockerfile
@@ -110,7 +110,7 @@ task:
         - git diff --exit-code
 
 task:
-    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/remote-testing/*', 'docker/remote-testing/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
     env:
         RUSTFLAGS: '-D warnings'
         JOBS: 8
@@ -126,7 +126,7 @@ task:
                 cxx_package: g++-5
                 cc: gcc-5
                 cxx: g++-5
-                rust_version: 1.79.0
+                rust_version: 1.81.0
         - name: MSRV, GCC 14 (Ubuntu 24.04)
           container:
             greedy: true
@@ -135,7 +135,7 @@ task:
                 cxx_package: g++-14
                 cc: gcc-14
                 cxx: g++-14
-                rust_version: 1.79.0
+                rust_version: 1.81.0
 
         - name: GCC 14, more warnings and checks (Ubuntu 24.04)
           container:
@@ -237,14 +237,6 @@ task:
                 cxx_package: g++-14
                 cc: gcc-14
                 cxx: g++-14
-        - name: Rust stable, Clang 4.0 (Ubuntu 18.04)
-          container:
-            greedy: true
-            dockerfile: docker/ubuntu_18.04-build-tools.dockerfile
-            docker_arguments:
-                cxx_package: clang-4.0
-                cc: clang-4.0
-                cxx: clang++-4.0
         - name: Rust stable, Clang 5.0 (Ubuntu 18.04)
           container:
             greedy: true
@@ -369,7 +361,7 @@ task:
 
 task:
     name: AddressSanitizer (Clang 18, Ubuntu 24.04)
-    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/remote-testing/*', 'docker/remote-testing/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
 
     container:
       greedy: true
@@ -398,7 +390,7 @@ task:
 
 task:
     name: UB Sanitizer (Clang 18, Ubuntu 24.04)
-    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/remote-testing/*', 'docker/remote-testing/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
 
     container:
       greedy: true
@@ -479,7 +471,7 @@ task:
 
 task:
     name: clang-tidy (Clang 18, Ubuntu 24.04)
-    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
+    skip: "changesIncludeOnly('contrib/*', 'contrib/**/*', 'doc/*', 'doc/**/*', 'docker/remote-testing/*', 'docker/remote-testing/**/*', 'po/*', 'po/**/*', 'snap/*', 'snap/**/*')"
 
     container:
       greedy: true

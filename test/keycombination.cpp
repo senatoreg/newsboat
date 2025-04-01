@@ -21,8 +21,8 @@ TEST_CASE("KeyCombination parses bind-key key combinations", "[KeyCombination]")
 	check("^a", "a", false, true, false);
 	check("^A", "a", false, true, false);
 
-	check("<", "<", false, false, false);
-	check(">", ">", false, false, false);
+	check("<", "LT", false, false, false);
+	check(">", "GT", false, false, false);
 	check("ENTER", "ENTER", false, false, false);
 }
 
@@ -116,7 +116,7 @@ TEST_CASE("to_bind_string", "[KeyCombination]")
 {
 	REQUIRE(KeyCombination("a").to_bind_string() == "a");
 	REQUIRE(KeyCombination("=").to_bind_string() == "=");
-	REQUIRE(KeyCombination("^").to_bind_string() == "^");
+	REQUIRE(KeyCombination("^").to_bind_string() == "<^>");
 	REQUIRE(KeyCombination(">").to_bind_string() == ">");
 	REQUIRE(KeyCombination("a", ShiftState::Shift).to_bind_string() == "A");
 	REQUIRE(KeyCombination("a", ShiftState::NoShift,

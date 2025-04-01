@@ -62,7 +62,13 @@ std::string KeyCombination::to_bindkey_string() const
 	} else if (shift == ShiftState::Shift && key.length() == 1) {
 		return strprintf::fmt("%c", static_cast<char>(std::toupper(key[0])));
 	} else {
-		return key;
+		if (key == "LT") {
+			return "<";
+		} else if (key == "GT") {
+			return ">";
+		} else {
+			return key;
+		}
 	}
 }
 
@@ -76,8 +82,16 @@ std::string KeyCombination::to_bind_string() const
 			return strprintf::fmt("^%c", static_cast<char>(std::toupper(key[0])));
 		}
 	}
-	if (key.size() == 1 && !has_shift() && !has_control() && !has_alt()) {
-		return key;
+	if (!has_shift() && !has_control() && !has_alt()) {
+		if (key == "LT") {
+			return "<";
+		} else if (key == "GT") {
+			return ">";
+		} else if (key == "^") {
+			return "<^>";
+		} else if (key.size() == 1) {
+			return key;
+		}
 	}
 
 	std::string modifiers = "";

@@ -48,10 +48,10 @@ void FeedListFormAction::init()
 {
 	recalculate_widget_dimensions();
 
-	if (v.get_ctrl()->get_refresh_on_start()) {
-		v.get_ctrl()->get_reloader()->start_reload_all_thread();
+	if (v.get_ctrl().get_refresh_on_start()) {
+		v.get_ctrl().get_reloader()->start_reload_all_thread();
 	}
-	v.get_ctrl()->update_feedlist();
+	v.get_ctrl().update_feedlist();
 
 	/*
 	 * This is kind of a hack.
@@ -59,7 +59,7 @@ void FeedListFormAction::init()
 	 * ReloadThread, which is responsible for regularly spawning
 	 * DownloadThreads.
 	 */
-	v.get_ctrl()->get_reloader()->spawn_reloadthread();
+	v.get_ctrl().get_reloader()->spawn_reloadthread();
 }
 
 void FeedListFormAction::prepare()
@@ -68,14 +68,14 @@ void FeedListFormAction::prepare()
 
 	const auto sort_strategy = cfg->get_feed_sort_strategy();
 	if (!old_sort_strategy || sort_strategy != *old_sort_strategy) {
-		v.get_ctrl()->get_feedcontainer()->sort_feeds(sort_strategy);
+		v.get_ctrl().get_feedcontainer()->sort_feeds(sort_strategy);
 		old_sort_strategy = sort_strategy;
 		do_redraw = true;
 	}
 
 	if (do_redraw) {
 		LOG(Level::DEBUG, "FeedListFormAction::prepare: doing redraw");
-		v.get_ctrl()->update_feedlist();
+		v.get_ctrl().update_feedlist();
 		set_pos();
 		do_redraw = false;
 	}
@@ -113,7 +113,7 @@ REDO:
 		LOG(Level::INFO,
 			"FeedListFormAction: reloading feed at position `%d'", pos);
 		if (visible_feeds.size() > 0) {
-			v.get_ctrl()->get_reloader()->reload(pos);
+			v.get_ctrl().get_reloader()->reload(pos);
 		} else {
 			v.get_statusline().show_error(
 				_("No feed selected!")); // should not happen
@@ -121,7 +121,7 @@ REDO:
 	}
 	break;
 	case OP_RELOADURLS:
-		v.get_ctrl()->reload_urls_file();
+		v.get_ctrl().reload_urls_file();
 		break;
 	case OP_SORT: {
 		// i18n: This string is related to the letters in parentheses in the
@@ -216,7 +216,7 @@ REDO:
 	case OP_OPENALLUNREADINBROWSER:
 		if (visible_feeds.size() > 0) {
 			std::shared_ptr<RssFeed> feed =
-				v.get_ctrl()->get_feedcontainer()->get_feed(pos);
+				v.get_ctrl().get_feedcontainer()->get_feed(pos);
 			if (feed) {
 				LOG(Level::INFO,
 					"FeedListFormAction: opening all unread items in feed at position `%d'",
@@ -243,7 +243,7 @@ REDO:
 	case OP_OPENALLUNREADINBROWSER_AND_MARK:
 		if (visible_feeds.size() > 0) {
 			std::shared_ptr<RssFeed> feed =
-				v.get_ctrl()->get_feedcontainer()->get_feed(pos);
+				v.get_ctrl().get_feedcontainer()->get_feed(pos);
 			if (feed) {
 				LOG(Level::INFO,
 					"FeedListFormAction: opening all unread items in feed at position `%d' and marking read",
@@ -284,7 +284,7 @@ REDO:
 					idxs.push_back(feed.second);
 				}
 			}
-			v.get_ctrl()->get_reloader()->start_reload_all_thread(idxs);
+			v.get_ctrl().get_reloader()->start_reload_all_thread(idxs);
 		}
 		break;
 	case OP_MARKFEEDREAD: {
@@ -298,7 +298,7 @@ REDO:
 					{
 						const auto message_lifetime = v.get_statusline().show_message_until_finished(
 								_("Marking feed read..."));
-						v.get_ctrl()->mark_all_read(pos);
+						v.get_ctrl().mark_all_read(pos);
 						do_redraw = true;
 					}
 					bool show_read = cfg->get_configvalue_as_bool("show-read-feeds");
@@ -381,14 +381,14 @@ REDO:
 			const auto message_lifetime = v.get_statusline().show_message_until_finished(
 					_("Marking all feeds read..."));
 			if (tag == "") {
-				v.get_ctrl()->mark_all_read("");
+				v.get_ctrl().mark_all_read("");
 			} else {
 				// we're in tag view, so let's only touch feeds that are
 				// visible
 				for (const auto& feedptr_pos_pair : visible_feeds) {
 					auto rss_feed_ptr = feedptr_pos_pair.first;
 					auto feedurl = rss_feed_ptr->rssurl();
-					v.get_ctrl()->mark_all_read(feedurl);
+					v.get_ctrl().mark_all_read(feedurl);
 				}
 			}
 			do_redraw = true;
@@ -441,12 +441,12 @@ REDO:
 			// the finished_qna() by ourselves to simulate a "Q&A"
 			// session that is in fact macro-driven.
 			qna_responses.push_back(args.front());
-			finished_qna(OP_INT_START_SEARCH);
+			finished_qna(QnaFinishAction::Search);
 		} else {
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Search for: "), ""));
 			this->start_qna(
-				qna, OP_INT_START_SEARCH, &searchhistory);
+				qna, QnaFinishAction::Search, &searchhistory);
 		}
 		break;
 	case OP_GOTO_TITLE:
@@ -456,22 +456,22 @@ REDO:
 				std::vector<QnaPair> qna {
 					QnaPair(_("Title: "), "")
 				};
-				this->start_qna(qna, OP_INT_GOTO_TITLE);
+				this->start_qna(qna, QnaFinishAction::GotoTitle);
 			} else {
 				qna_responses = {args[0]};
-				finished_qna(OP_INT_GOTO_TITLE);
+				finished_qna(QnaFinishAction::GotoTitle);
 			}
 			break;
 		case BindingType::Macro:
 			if (args.size() >= 1) {
 				qna_responses = {args[0]};
-				finished_qna(OP_INT_GOTO_TITLE);
+				finished_qna(QnaFinishAction::GotoTitle);
 			}
 			break;
 		case BindingType::BindKey:
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Title: "), ""));
-			this->start_qna(qna, OP_INT_GOTO_TITLE);
+			this->start_qna(qna, QnaFinishAction::GotoTitle);
 			break;
 		}
 		break;
@@ -484,16 +484,16 @@ REDO:
 		if (args.size() > 0) {
 			qna_responses.clear();
 			qna_responses.push_back(args.front());
-			finished_qna(OP_INT_END_SETFILTER);
+			finished_qna(QnaFinishAction::SetFilter);
 		} else {
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Filter: "), ""));
 			this->start_qna(
-				qna, OP_INT_END_SETFILTER, &filterhistory);
+				qna, QnaFinishAction::SetFilter, &filterhistory);
 		}
 		break;
 	case OP_EDIT_URLS:
-		v.get_ctrl()->edit_urls_file();
+		v.get_ctrl().edit_urls_file();
 		break;
 	case OP_QUIT:
 		if (tag != "") {
@@ -536,7 +536,7 @@ bool FeedListFormAction::open_position_in_browser(unsigned int pos,
 		return false;
 	}
 
-	std::shared_ptr<RssFeed> feed = v.get_ctrl()->get_feedcontainer()->get_feed(
+	std::shared_ptr<RssFeed> feed = v.get_ctrl().get_feedcontainer()->get_feed(
 			pos);
 	if (feed == nullptr) {
 		v.get_statusline().show_error(_("No feed selected!"));
@@ -870,18 +870,18 @@ void FeedListFormAction::handle_goto(const std::string& param)
 	}
 }
 
-void FeedListFormAction::finished_qna(Operation op)
+void FeedListFormAction::finished_qna(QnaFinishAction op)
 {
 	FormAction::finished_qna(op); // important!
 
 	switch (op) {
-	case OP_INT_END_SETFILTER:
+	case QnaFinishAction::SetFilter:
 		op_end_setfilter();
 		break;
-	case OP_INT_START_SEARCH:
+	case QnaFinishAction::Search:
 		op_start_search();
 		break;
-	case OP_INT_GOTO_TITLE:
+	case QnaFinishAction::GotoTitle:
 		goto_feed(qna_responses[0]);
 		break;
 	default:
@@ -893,7 +893,7 @@ void FeedListFormAction::mark_pos_if_visible(unsigned int pos)
 {
 	ScopeMeasure m1("FeedListFormAction::mark_pos_if_visible");
 	unsigned int vpos = 0;
-	v.get_ctrl()->update_visible_feeds();
+	v.get_ctrl().update_visible_feeds();
 	for (const auto& feed : visible_feeds) {
 		if (feed.second == pos) {
 			LOG(Level::DEBUG,
@@ -907,7 +907,7 @@ void FeedListFormAction::mark_pos_if_visible(unsigned int pos)
 		vpos++;
 	}
 	vpos = 0;
-	pos = v.get_ctrl()->get_feedcontainer()->get_pos_of_next_unread(pos);
+	pos = v.get_ctrl().get_feedcontainer()->get_pos_of_next_unread(pos);
 	for (const auto& feed : visible_feeds) {
 		if (feed.second == pos) {
 			LOG(Level::DEBUG,
@@ -936,7 +936,7 @@ void FeedListFormAction::register_format_styles()
 	const std::string attrstr = rxman.get_attrs_stfl_string("feedlist", true);
 	const std::string textview = strprintf::fmt(
 			"{!list[feeds] .expand:vh style_normal[listnormal]: "
-			"style_focus[listfocus]:fg=yellow,bg=blue,attr=bold "
+			"style_focus[listfocus]: "
 			"pos[feeds_pos]:0 offset[feeds_offset]:0 %s richtext:1}",
 			attrstr);
 	list.stfl_replace_list(textview);
@@ -998,7 +998,7 @@ void FeedListFormAction::op_start_search()
 		std::vector<std::shared_ptr<RssItem>> items;
 		try {
 			const auto utf8searchphrase = utils::locale_to_utf8(searchphrase);
-			items = v.get_ctrl()->search_for_items(
+			items = v.get_ctrl().search_for_items(
 					utf8searchphrase, nullptr);
 		} catch (const DbException& e) {
 			v.get_statusline().show_error(strprintf::fmt(

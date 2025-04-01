@@ -157,7 +157,7 @@ branch off the latest release and backport the bugfixes onto it.
 
 ## If you're making a minor release (x.Y.z)
 
-1. Add a TaskWarrior reminder to myself to update the POT file and ask for
+1. Add a reminder to myself to update the POT file and ask for
    updated translations two weeks before the next release
 2. Prepare the repo for the next release:
     * Add "Unreleased" section to CHANGELOG.
@@ -186,7 +186,7 @@ branch off the latest release and backport the bugfixes onto it.
 
         gpg> save
     * upload it to the keyserver:
-        `gpg --keyserver pgp.mit.edu --send-keys 4ED6CD61932B9EBE`
+        `gpg --keyserver keys.openpgp.org --send-keys 4ED6CD61932B9EBE`
     * export it to a file:
         `gpg --armour --export 4ED6CD61932B9EBE > newsboat.pgp`
     * upload the file to newsboat.org staging area

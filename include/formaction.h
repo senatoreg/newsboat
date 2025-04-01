@@ -33,12 +33,6 @@ enum class CommandType {
 	INVALID, 	/// differs from UNKNOWN in that no input was parsed
 };
 
-enum class BindingType {
-	BindKey,
-	Macro,
-	Bind,
-};
-
 struct Command {
 	CommandType type;
 	std::vector<std::string> args;
@@ -47,6 +41,18 @@ struct Command {
 		: type(type)
 		, args(args)
 	{}
+};
+
+enum class QnaFinishAction {
+	None,
+	Bookmark,
+	RunCmdLine,
+	GotoUrlByNumber,
+	UpdateFlags,
+	Search,
+	PipeItemIntoProgram,
+	GotoTitle,
+	SetFilter,
 };
 
 class FormAction {
@@ -78,12 +84,12 @@ public:
 		const std::vector<std::string>& args,
 		BindingType bindingType = BindingType::BindKey);
 
-	virtual void finished_qna(Operation op);
+	virtual void finished_qna(QnaFinishAction op);
 
 	void start_cmdline(std::string default_value = "");
 
 	void start_qna(const std::vector<QnaPair>& prompts,
-		Operation finish_op,
+		QnaFinishAction finish_op,
 		History* h = nullptr);
 	void finish_qna_question();
 	void cancel_qna();
@@ -164,7 +170,7 @@ private:
 	LineView msg_line;
 	LineView qna_prompt_line;
 	std::vector<QnaPair> qna_prompts;
-	Operation finish_operation;
+	QnaFinishAction qna_finish_operation;
 	History* qna_history;
 	std::shared_ptr<FormAction> parent_formaction;
 };

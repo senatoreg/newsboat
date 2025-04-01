@@ -170,7 +170,7 @@ bool ItemViewFormAction::process_operation(Operation op,
 		bool old_unread = item->unread();
 		item->set_unread(false);
 		if (old_unread) {
-			v.get_ctrl()->mark_article_read(item->guid(), true);
+			v.get_ctrl().mark_article_read(item->guid(), true);
 		}
 	} catch (const DbException& e) {
 		v.get_statusline().show_error(strprintf::fmt(
@@ -213,7 +213,7 @@ bool ItemViewFormAction::process_operation(Operation op,
 			v.get_statusline().show_error(_("Aborted saving."));
 		} else {
 			try {
-				v.get_ctrl()->write_item(*item, filename.value());
+				v.get_ctrl().write_item(*item, filename.value());
 				v.get_statusline().show_message(strprintf::fmt(
 						_("Saved article to %s."), filename.value()));
 			} catch (...) {
@@ -253,7 +253,7 @@ bool ItemViewFormAction::process_operation(Operation op,
 					args.front(),
 					feed->title(),
 				};
-				finished_qna(OP_INT_BM_END);
+				finished_qna(QnaFinishAction::Bookmark);
 			}
 			break;
 		case BindingType::Macro:
@@ -263,7 +263,7 @@ bool ItemViewFormAction::process_operation(Operation op,
 			qna_responses.push_back(
 				args.size() > 0 ? args.front() : "");
 			qna_responses.push_back(feed->title());
-			finished_qna(OP_INT_BM_END);
+			finished_qna(QnaFinishAction::Bookmark);
 			break;
 		case BindingType::BindKey:
 			this->start_bookmark_qna(
@@ -278,23 +278,23 @@ bool ItemViewFormAction::process_operation(Operation op,
 		case BindingType::Bind:
 			if (args.empty()) {
 				qna.push_back(QnaPair(_("Search for: "), ""));
-				this->start_qna(qna, OP_INT_START_SEARCH, &searchhistory);
+				this->start_qna(qna, QnaFinishAction::Search, &searchhistory);
 			} else {
 				qna_responses = { args.front() };
-				finished_qna(OP_INT_START_SEARCH);
+				finished_qna(QnaFinishAction::Search);
 			}
 			break;
 		case BindingType::Macro:
 			if (args.size() > 0) {
 				qna_responses.clear();
 				qna_responses.push_back(args.front());
-				finished_qna(OP_INT_START_SEARCH);
+				finished_qna(QnaFinishAction::Search);
 			}
 			break;
 		case BindingType::BindKey:
 			qna.push_back(QnaPair(_("Search for: "), ""));
 			this->start_qna(
-				qna, OP_INT_START_SEARCH, &searchhistory);
+				qna, QnaFinishAction::Search, &searchhistory);
 			break;
 		}
 	}
@@ -305,23 +305,23 @@ bool ItemViewFormAction::process_operation(Operation op,
 		case BindingType::Bind:
 			if (args.empty()) {
 				qna.push_back(QnaPair(_("Pipe article to command: "), ""));
-				this->start_qna(qna, OP_PIPE_TO, &cmdlinehistory);
+				this->start_qna(qna, QnaFinishAction::PipeItemIntoProgram, &cmdlinehistory);
 			} else {
 				qna_responses = { args.front() };
-				finished_qna(OP_PIPE_TO);
+				finished_qna(QnaFinishAction::PipeItemIntoProgram);
 			}
 			break;
 		case BindingType::Macro:
 			if (args.size() > 0) {
 				qna_responses.clear();
 				qna_responses.push_back(args.front());
-				finished_qna(OP_PIPE_TO);
+				finished_qna(QnaFinishAction::PipeItemIntoProgram);
 			}
 			break;
 		case BindingType::BindKey:
 			qna.push_back(
 				QnaPair(_("Pipe article to command: "), ""));
-			this->start_qna(qna, OP_PIPE_TO, &cmdlinehistory);
+			this->start_qna(qna, QnaFinishAction::PipeItemIntoProgram, &cmdlinehistory);
 			break;
 		}
 	}
@@ -331,25 +331,25 @@ bool ItemViewFormAction::process_operation(Operation op,
 		case BindingType::Bind:
 			if (args.empty()) {
 				qna_responses = { args.front() };
-				this->finished_qna(OP_INT_EDITFLAGS_END);
+				this->finished_qna(QnaFinishAction::UpdateFlags);
 			} else {
 				std::vector<QnaPair> qna {
 					QnaPair(_("Flags: "), item->flags()),
 				};
-				this->start_qna(qna, OP_INT_EDITFLAGS_END);
+				this->start_qna(qna, QnaFinishAction::UpdateFlags);
 			}
 			break;
 		case BindingType::Macro:
 			qna_responses.clear();
 			if (args.size() > 0) {
 				qna_responses.push_back(args.front());
-				this->finished_qna(OP_INT_EDITFLAGS_END);
+				this->finished_qna(QnaFinishAction::UpdateFlags);
 			}
 			break;
 		case BindingType::BindKey:
 			std::vector<QnaPair> qna;
 			qna.push_back(QnaPair(_("Flags: "), item->flags()));
-			this->start_qna(qna, OP_INT_EDITFLAGS_END);
+			this->start_qna(qna, QnaFinishAction::UpdateFlags);
 			break;
 		}
 		break;
@@ -366,7 +366,7 @@ bool ItemViewFormAction::process_operation(Operation op,
 		} else {
 			qna_responses.clear();
 			qna_responses.push_back(urlviewer);
-			this->finished_qna(OP_PIPE_TO);
+			this->finished_qna(QnaFinishAction::PipeItemIntoProgram);
 		}
 	}
 	break;
@@ -441,14 +441,14 @@ bool ItemViewFormAction::process_operation(Operation op,
 			if (args.size() > 0) {
 				if (args.front() == "read") {
 					item->set_unread(false);
-					v.get_ctrl()->mark_article_read(item->guid(), true);
+					v.get_ctrl().mark_article_read(item->guid(), true);
 				} else if (args.front() == "unread") {
 					item->set_unread(true);
-					v.get_ctrl()->mark_article_read(item->guid(), false);
+					v.get_ctrl().mark_article_read(item->guid(), false);
 				}
 			} else {
 				item->set_unread(true);
-				v.get_ctrl()->mark_article_read(item->guid(), false);
+				v.get_ctrl().mark_article_read(item->guid(), false);
 			}
 		} catch (const DbException& e) {
 			v.get_statusline().show_error(strprintf::fmt(
@@ -498,28 +498,28 @@ bool ItemViewFormAction::process_operation(Operation op,
 		case BindingType::Bind:
 			if (args.empty()) {
 				qna.push_back(QnaPair(_("Goto URL #"), ""));
-				this->start_qna(qna, OP_INT_GOTO_URL);
+				this->start_qna(qna, QnaFinishAction::GotoUrlByNumber);
 			} else {
 				qna_responses = { args.front() };
-				finished_qna(OP_INT_GOTO_URL);
+				finished_qna(QnaFinishAction::GotoUrlByNumber);
 			}
 			break;
 		case BindingType::Macro:
 			if (args.size() > 0) {
 				qna_responses.clear();
 				qna_responses.push_back(args.front());
-				finished_qna(OP_INT_GOTO_URL);
+				finished_qna(QnaFinishAction::GotoUrlByNumber);
 			}
 			break;
 		case BindingType::BindKey:
 			qna.push_back(QnaPair(_("Goto URL #"), ""));
-			this->start_qna(qna, OP_INT_GOTO_URL);
+			this->start_qna(qna, QnaFinishAction::GotoUrlByNumber);
 			break;
 		}
 	}
 	break;
 	case OP_ARTICLEFEED: {
-		auto feeds = v.get_ctrl()->get_feedcontainer()->get_all_feeds();
+		auto feeds = v.get_ctrl().get_feedcontainer()->get_all_feeds();
 		size_t pos;
 		auto article_feed = item->get_feedptr();
 		for (pos = 0; pos < feeds.size(); pos++) {
@@ -633,7 +633,7 @@ void ItemViewFormAction::handle_save(const std::string& filename_param)
 		v.get_statusline().show_error(_("Aborted saving."));
 	} else {
 		try {
-			v.get_ctrl()->write_item(
+			v.get_ctrl().write_item(
 				*item, filename);
 			v.get_statusline().show_message(strprintf::fmt(
 					_("Saved article to %s"),
@@ -647,24 +647,24 @@ void ItemViewFormAction::handle_save(const std::string& filename_param)
 	}
 }
 
-void ItemViewFormAction::finished_qna(Operation op)
+void ItemViewFormAction::finished_qna(QnaFinishAction op)
 {
 	FormAction::finished_qna(op); // important!
 
 	switch (op) {
-	case OP_INT_EDITFLAGS_END:
+	case QnaFinishAction::UpdateFlags:
 		item->set_flags(qna_responses[0]);
-		v.get_ctrl()->update_flags(item);
+		v.get_ctrl().update_flags(item);
 		v.get_statusline().show_message(_("Flags updated."));
 		do_redraw = true;
 		break;
-	case OP_INT_START_SEARCH:
+	case QnaFinishAction::Search:
 		do_search();
 		break;
-	case OP_PIPE_TO: {
+	case QnaFinishAction::PipeItemIntoProgram: {
 		std::string cmd = qna_responses[0];
 		std::ostringstream ostr;
-		v.get_ctrl()->write_item(*feed->get_item_by_guid(guid), ostr);
+		v.get_ctrl().write_item(*feed->get_item_by_guid(guid), ostr);
 		v.push_empty_formaction();
 		Stfl::reset();
 		FILE* f = popen(cmd.c_str(), "w");
@@ -677,7 +677,7 @@ void ItemViewFormAction::finished_qna(Operation op)
 		v.pop_current_formaction();
 	}
 	break;
-	case OP_INT_GOTO_URL: {
+	case QnaFinishAction::GotoUrlByNumber: {
 		unsigned int idx = 0;
 		sscanf(qna_responses[0].c_str(), "%u", &idx);
 		if (idx && idx - 1 < links.size()) {
@@ -696,11 +696,11 @@ void ItemViewFormAction::register_format_styles()
 {
 	std::string attrstr = rxman.get_attrs_stfl_string("article", false);
 	attrstr.append(
-		"@style_b_normal[color_bold]:attr=bold "
-		"@style_u_normal[color_underline]:attr=underline ");
+		"@style_b_normal[color_bold]: "
+		"@style_u_normal[color_underline]: ");
 	std::string stfl_textview = strprintf::fmt(
 			"{textview[article] style_normal[article]: "
-			"style_end[end-of-text-marker]:fg=blue,attr=bold %s .expand:vh "
+			"style_end[end-of-text-marker]: %s .expand:vh "
 			"offset[article_offset]:0 richtext:1}",
 			attrstr);
 	textview.stfl_replace_textview(0, stfl_textview);

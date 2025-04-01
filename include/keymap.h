@@ -2,14 +2,25 @@
 #define NEWSBOAT_KEYMAP_H_
 
 #include <map>
-#include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
+#include "3rd-party/optional.hpp"
 #include "configactionhandler.h"
 #include "keycombination.h"
 
-// in configuration: bind-key <key> <operation>
+enum class BindingType {
+	BindKey,
+	Macro,
+	Bind,
+};
+
+enum class MultiKeyBindingState {
+	Found,
+	NotFound,
+	MoreInputNeeded,
+};
 
 enum { KM_FEEDLIST = 1 << 0,
 	KM_FILEBROWSER = 1 << 1,
@@ -96,6 +107,7 @@ enum Operation {
 	OP_NB_MAX,
 	OP_PREVSEARCHRESULTS,
 	OP_ARTICLEFEED,
+	OP_SET,
 
 	// podboat-specific operations:
 	OP_PB_MIN = 1000,
@@ -122,20 +134,6 @@ enum Operation {
 
 	OP_SK_MAX,
 
-	OP_INT_MIN = 2000,
-
-	OP_INT_END_CMDLINE,
-	OP_INT_END_SETFILTER,
-	OP_INT_BM_END,
-	OP_INT_EDITFLAGS_END,
-	OP_INT_START_SEARCH,
-	OP_INT_GOTO_TITLE,
-
-	OP_INT_GOTO_URL,
-
-	OP_INT_SET,
-
-	OP_INT_MAX,
 	OP_OPEN_URL_1 = 3001,
 	OP_OPEN_URL_2,
 	OP_OPEN_URL_3,
@@ -188,8 +186,32 @@ struct KeyMapHintEntry {
 
 struct Mapping {
 	bool is_leaf_node = false;
+	BindingType binding_type = BindingType::Bind;
 	std::map<KeyCombination, Mapping> continuations = {};
 	MacroBinding action = {};
+};
+
+struct HelpBindInfo {
+	std::string key_sequence;
+	nonstd::optional<std::string> op_name;
+	std::size_t op_order_pos;
+	std::string description;
+};
+
+struct HelpMacroInfo {
+	std::string key_sequence;
+	std::string description;
+};
+
+struct UnboundAction {
+	std::string op_name;
+	std::string description;
+};
+
+struct HelpInfo {
+	std::vector<HelpBindInfo> bindings;
+	std::vector<UnboundAction> unused;
+	std::vector<HelpMacroInfo> macros;
 };
 
 class KeyMap : public ConfigActionHandler {
@@ -202,16 +224,16 @@ public:
 	void unset_key(const KeyCombination& key, const std::string& context);
 	void unset_all_keys(const std::string& context);
 	static Operation get_opcode(const std::string& opstr);
-	Operation get_operation(const KeyCombination& key_combination,
-		const std::string& context);
+	std::vector<MacroCmd> get_operation(const std::vector<KeyCombination>& key_sequence,
+		const std::string& context, MultiKeyBindingState& state, BindingType& type);
 	std::vector<MacroCmd> get_macro(const KeyCombination& key_combination);
 	char get_key(const std::string& keycode);
 	std::vector<KeyCombination> get_keys(Operation op, const std::string& context);
 	void handle_action(const std::string& action,
 		const std::string& params) override;
 	void dump_config(std::vector<std::string>& config_output) const override;
+	HelpInfo get_help_info(std::string context);
 	std::vector<KeyMapDesc> get_keymap_descriptions(std::string context);
-	const std::map<KeyCombination, MacroBinding>& get_macro_descriptions();
 
 	ParsedOperations parse_operation_sequence(const std::string& line,
 		const std::string& command_name, bool allow_description = true);
@@ -221,13 +243,21 @@ public:
 		const std::string& context);
 
 private:
+	std::vector<HelpBindInfo> get_help_info_bindings(std::set<Operation>& unused_actions,
+		const Mapping& mapping,
+		const std::string& key_sequence_prefix = "");
+	std::vector<HelpMacroInfo> get_help_info_macros();
+	std::string describe_actions(const std::vector<MacroCmd>& cmds);
+	std::vector<MacroCmd> get_operation(const Mapping& mapping,
+		const std::vector<KeyCombination>& key_sequence, MultiKeyBindingState& state,
+		BindingType& type);
 	void apply_bind(Mapping& target, const std::vector<KeyCombination> key_sequence,
-		const std::vector<MacroCmd>& cmds, const std::string& description);
+		const std::vector<MacroCmd>& cmds, const std::string& description, BindingType type);
+	void apply_bindkey(Mapping& target, const KeyCombination& key_combination, Operation op);
 	bool is_valid_context(const std::string& context);
 	unsigned short get_flag_from_context(const std::string& context);
-	std::map<KeyCombination, Operation> get_internal_operations() const;
+	Mapping get_internal_operations() const;
 	std::string getopname(Operation op) const;
-	std::map<std::string, std::map<KeyCombination, Operation>> keymap_;
 	std::map<std::string, Mapping> context_keymaps;
 	std::map<KeyCombination, MacroBinding> macros_;
 	std::vector<MacroCmd> startup_operations_sequence;

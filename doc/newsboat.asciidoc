@@ -69,9 +69,13 @@ Debian and derivatives, headers are in `-dev` packages, e.g. `libsqlite3-dev`.)
 
 // UPDATE README.md IF YOU CHANGE THIS LIST
 - GNU Make 4.0 or newer
-- GCC 5.0 or newer, or Clang 3.6 or newer
+- C{plus}{plus} compiler that accepts `-std=c{plus}{plus}17` option: GCC 5.0 or
+  newer, or Clang 5 or newer. If you have libicu 76 or newer, than
+  C{plus}{plus}17 support is required as Newsboat indirectly depends on libicu
+  headers via libxml2. Newsboat 2.40 (ETA 2025.06.22) is expected to require
+  a compiler that _supports_ C{plus}{plus}17
 - Stable https://www.rust-lang.org/en-US/[Rust] and Cargo (Rust's package
-  manager) (1.79.0 or newer; might work with older versions, but we don't check
+  manager) (1.81.0 or newer; might work with older versions, but we don't check
   that)
 - https://github.com/newsboat/stfl[STFL (version 0.21 or newer)] (the link
   points to our own fork because http://www.clifford.at/stfl/[the upstream] is
@@ -298,8 +302,8 @@ that shall be used:
 	oldreader-flag-share "a"
 	oldreader-flag-star "b"
 
-After that, use these flags when you edit flags for an article, and these
-articles will be starred resp. shared.
+After that, use these flags when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred resp. shared.
 
 By default, Newsboat also shows The Old Reader "special feeds":
 
@@ -440,8 +444,8 @@ used:
 
 	freshrss-flag-star "s"
 
-After that, use this flag when you edit flags for an article, and these
-articles will be starred.
+After that, use this flag when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred.
 
 By default a "Starred Items" feed is included in the feed list. This can be
 removed with:
@@ -507,8 +511,8 @@ In order to use this mapping, you need to configure the flags that shall be used
 	ttrss-flag-star "s"
 	ttrss-flag-publish "p"
 
-After that, use these flags when you edit flags for an article, and these articles
-will be starred resp. published.
+After that, use these flags when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred resp. published.
 
 TT-RSS folders are converted into Newsboat tags. You can select and filter
 feeds by tags; see <<_tagging>> and <<_filter_language>> for details.
@@ -554,6 +558,9 @@ flag to the "star" operation.
 In order to use this mapping, you need to configure the flag that shall be used:
 
 	ocnews-flag-star "s"
+
+After that, use these flags when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred.
 
 OwnCloud News' folders are converted into Newsboat tags. You can select and
 filter feeds by tags; see <<_tagging>> and <<_filter_language>> for details.
@@ -625,8 +632,8 @@ that shall be used:
 	inoreader-flag-share "a"
 	inoreader-flag-star "b"
 
-After that, use these flags when you edit flags for an article, and these
-articles will be starred resp. shared.
+After that, use these flags when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred resp. shared.
 
 By default, Newsboat also shows Inoreader "special feeds":
 
@@ -691,8 +698,8 @@ that shall be used:
 
 	miniflux-flag-star "a"
 
-After that, use these flags when you edit flags for an article, and these
-articles will be starred.
+After that, use these flags when you <<#_flagging_articles,edit flags for an
+article>>, and these articles will be starred.
 
 By default a "Starred Items" feed is included in the feed list. This can be
 removed with:
@@ -741,7 +748,7 @@ the URL view. The actual bookmarking is performed by a program that you specify
 via the <<bookmark-cmd,`bookmark-cmd`>> setting; Newsboat merely supplies the
 data.
 
-To bookmark the currently selected item, press `^B` (invoking the
+To bookmark the currently selected item, press kbd:[Ctrl+B] (invoking the
 <<bookmark,`bookmark`>> operation), and Newsboat will ask you for:
 
 1. the URL to bookmark (already preset with the URL of the current selection);
@@ -810,9 +817,9 @@ following examples:
 The possibilities for combining such queries is endless, sky (actually:
 the available memory) is the limit.
 
-To filter your feeds, press "F" in the feed list, enter your filter expression,
-and press "Enter".  To clear the filter, press "Ctrl-F". To filter the articles in the article list,
-press "F", enter your expression, and press "Enter". Clearing the filter works the same as before.
+To filter your feeds, press kbd:[Shift+F] in the feed list, enter your filter expression,
+and press kbd:[Enter].  To clear the filter, press kbd:[Ctrl+F]. To filter the articles in the article list,
+press kbd:[Shift+F], enter your expression, and press kbd:[Enter]. Clearing the filter works the same as before.
 Be aware that only certain attributes work in both dialogs. The table below lists all available
 attributes and their context, i.e. an attribute that belongs to a feed can only be matched
 in the feed list, while an attribute that belongs to an article can only be matched in the
@@ -975,9 +982,9 @@ To support custom categorization of articles by the user, it is possible to
 flag an article. A valid flag is any character from _A_ to _Z_ and from _a_ to
 _z_. Every article can be flagged with up to 52 different flags, i.e. every
 letter from the Roman alphabet in upper and lower case. Flagging is easy: just
-select an article in the article list, or enter the article view, and press "Ctrl-E".
-This will start the flag editor. By pressing "Enter", the new flags are saved.
-You can cancel by pressing the "Esc" key.
+select an article in the article list, or enter the article view, and press :kbd:[Ctrl+E].
+This will start the flag editor. By pressing kbd:[Enter], the new flags are saved.
+You can cancel by pressing the kbd:[Esc] key.
 
 The flags of an article can be used in every filter expression. The flags of an
 article are always ordered, and when new flags are added, ordering is
@@ -1297,34 +1304,40 @@ list, and the user can jump to another, previously opened dialog from
 everywhere. This allows a user to open more than one article list, more than one
 article view, etc., and switch between them without closing them.
 
-The main dialog for this feature can be reached by pressing the "v" key. This
+The main dialog for this feature can be reached by pressing the kbd:[V] key. This
 opens the list of open dialogs. From there, the user can switch to another
-dialog by selecting the appropriate entry and pressing "Enter", or can close
-open dialogs by selecting them and pressing "Ctrl-X".
+dialog by selecting the appropriate entry and pressing kbd:[Enter], or can close
+open dialogs by selecting them and pressing kbd:[Ctrl+X].
 
 === Macro Support
 
-Bindings created with <<bind-key,`bind-key`>> can only execute a single operation, like
-<<open,`open`>> or <<quit,`quit`>>. To execute multiple operations, one has to define a so-called
-"macro". To invoke the macro, the user presses the macro prefix ("," by
-default) and then the macro's key. It's easier to explain with some examples:
+Bindings created with <<bind-key,`bind-key`>> can only execute a single
+operation, like <<open,`open`>> or <<quit,`quit`>>. Macros where introduced to
+allow running multiple operations. However, we now have the <<bind,`bind`>>
+command which is more flexible and also allows running multiple operations. To
+read more about the <<bind,`bind`>> command, see <<_key_bindings,Key Bindings>>.
+
+To execute multiple operations, one can use the <<macro,`macro`>> command. To
+invoke the macro, the user presses the <<macro-prefix,`macro-prefix`>> (kbd:[,]
+by default) and then the macro's key. It's easier to explain with some
+examples:
 
   macro k open; reload; quit  -- "enter feed to reload it"
   macro o open-in-browser; toggle-article-read "read"
 
-Here, we define two macros. Now when the user types ",k", Newsboat will enter
+Here, we define two macros. Now when the user types kbd:[,]kbd:[K], Newsboat will enter
 the current feed, reload it, and go back to the feedlist. If the user types
-",o", Newsboat will open current article in the external browser, and also mark
+kbd:[,]kbd:[O], Newsboat will open current article in the external browser, and also mark
 it read. Note that macros can have a description which will be displayed in the
-help dialog when the user presses "?".
+help dialog when the user presses kbd:[?].
 
 Macros can invoke any of <<_newsboat_operations,Newsboat's operations>>. Keep
 in mind that some operations only make sense in certain situations, e.g.
 `reload` doesn't make sense while viewing an article. If you try to execute an
 operation that is not supported by the current dialog, it will be ignored.
 
-The macro prefix can be changed from the default "," to another key, e.g. "+"
-(if you don't unbind the default "," you're left with two macro prefixes):
+The macro prefix can be changed from the default kbd:[,] to another key, e.g. kbd:[+]
+(if you don't unbind the default kbd:[,] you're left with two macro prefixes):
 
   bind-key + macro-prefix
   unbind-key ,
@@ -1371,27 +1384,27 @@ To open any link with your browser, the versatile
 <<open-in-browser,`open-in-browser`>> operation can be used. Its behavior is
 specific to each dialog.
 
-The default keybinding for `open-in-browser` is "o". An alternative operation,
+The default keybinding for `open-in-browser` is kbd:[O]. An alternative operation,
 <<open-in-browser-and-mark-read,`open-in-browser-and-mark-read`>> also marks the
 article as read when in the article list, but doesn't work in the feed list.
-The default keybinding is "O".
+The default keybinding is kbd:[Shift+O].
 
 Articles usually contain links which point to different resources and websites.
 Newsboat detects those links and creates a list which can be seen at the bottom
 of the article view. To easily scroll through the list and choose a link to
-open, one can go to the URL view with the "u" key.
+open, one can go to the URL view with the kbd:[U] key.
 
 Those links can also be opened directly from the article view.
 Relevant operations are <<one,`one`>> to <<zero,`zero`>>
 (digits written as words) and <<goto-url,`goto-url`>>.
-Keys "1" to "0" can be used to open URL 1 to 10. To open URLs above 10,
-start with the "#" key, then type the URL's number, and press "Enter". To use
-goto-url inside a macro, simply append the URL's number (e.g. `goto-url 11`).
+Keys kbd:[1] to kbd:[0] can be used to open URL 1 to 10. To open URLs above 10,
+start with the kbd:[#] key, then type the URL's number, and press kbd:[Enter]. To use
+`goto-url` inside a macro, simply append the URL's number (e.g. `goto-url 11`).
 
 ==== Switching Browser for Different Tasks
 
 To manually change the browser from Newsboat internal command line, type
-`:set browser` followed by the command, and press "Enter".
+`:set browser` followed by the command, and press kbd:[Enter].
 The variable is only set temporarily (useful for testing), so next
 time Newsboat is launched, `browser` will reset to the command specified in your
 config file:
@@ -1611,7 +1624,7 @@ changes the subject and then let itself mark the article again as unread.
 		   >   update rss_item set unread = 1 where rowid == new.rowid;
 		   > end;
 
-4. Leave `sqlite3` with "Ctrl-D" or `.quit`.
+4. Leave `sqlite3` with kbd:[Ctrl+D] or `.quit`.
 
 That's it. Newsboat (well, its db) now marks articles as unread when their
 title changes. And nicely enough this works all inside Newsboat, no need to
@@ -1681,9 +1694,9 @@ include::podboat-cmds-linked.asciidoc[]
 MIT License
 
 Copyright 2006-2015 Andreas Krennmair <ak@newsbeuter.org> +
-Copyright 2015-2024 Alexander Batischev <eual.jp@gmail.com> +
+Copyright 2015-2025 Alexander Batischev <eual.jp@gmail.com> +
 Copyright 2006-2017 Newsbeuter contributors +
-Copyright 2017-2024 Newsboat contributors
+Copyright 2017-2025 Newsboat contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),

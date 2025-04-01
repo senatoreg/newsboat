@@ -5,6 +5,7 @@
 
 #include "3rd-party/catch.hpp"
 
+#include "config.h"
 #include "confighandlerexception.h"
 #include "keycombination.h"
 
@@ -15,18 +16,78 @@ static const auto contexts = { "feedlist", "filebrowser", "help", "articlelist",
 	"dialogs", "dirbrowser"
 };
 
+namespace {
+Operation check_single_command_binding(KeyMap& keymap,
+	const KeyCombination& key_combination, const std::string& context)
+{
+	MultiKeyBindingState binding_state{};
+	BindingType binding_type{};
+	const auto& cmds = keymap.get_operation({key_combination}, context, binding_state,
+			binding_type);
+	REQUIRE(binding_state == MultiKeyBindingState::Found);
+	REQUIRE(cmds.size() == 1);
+	return cmds.at(0).op;
+}
+
+void check_unbound(KeyMap& keymap, const KeyCombination& key_combination,
+	const std::string& context)
+{
+	MultiKeyBindingState binding_state{};
+	BindingType binding_type{};
+	keymap.get_operation({key_combination}, context, binding_state,
+		binding_type);
+	REQUIRE(binding_state == MultiKeyBindingState::NotFound);
+}
+}
+
 TEST_CASE("get_operation()", "[KeyMap]")
 {
 	KeyMap k(KM_NEWSBOAT);
 
-	REQUIRE(k.get_operation(KeyCombination("u"), "article") == OP_SHOWURLS);
-	REQUIRE(k.get_operation(KeyCombination("x", ShiftState::Shift), "feedlist") == OP_NIL);
-	REQUIRE(k.get_operation(KeyCombination(""), "feedlist") == OP_NIL);
-	REQUIRE(k.get_operation(KeyCombination("ENTER"), "feedlist") == OP_OPEN);
+	REQUIRE(check_single_command_binding(k, KeyCombination("u"), "article") == OP_SHOWURLS);
+	check_unbound(k, KeyCombination("x", ShiftState::Shift), "feedlist");
+	check_unbound(k, KeyCombination(""), "feedlist");
+	REQUIRE(check_single_command_binding(k, KeyCombination("ENTER"), "feedlist") == OP_OPEN);
 
 	SECTION("Returns OP_NIL after unset_key()") {
 		k.unset_key(KeyCombination("ENTER"), "all");
-		REQUIRE(k.get_operation(KeyCombination("ENTER"), "feedlist") == OP_NIL);
+		check_unbound(k, KeyCombination("ENTER"), "feedlist");
+	}
+
+	GIVEN("A multi-key binding specifying 'a' followed by ENTER") {
+		k.handle_action("bind", "a<ENTER> feedlist open");
+
+		const std::string context = "feedlist";
+		MultiKeyBindingState binding_state{};
+		BindingType type{};
+		WHEN("only 'a' is provided") {
+			const std::vector<KeyCombination> key_sequence = { KeyCombination("a") };
+			k.get_operation(key_sequence, context, binding_state, type);
+
+			THEN("more input is required") {
+				REQUIRE(binding_state == MultiKeyBindingState::MoreInputNeeded);
+			}
+		}
+		WHEN("'a' followed by ENTER is provided") {
+			const std::vector<KeyCombination> key_sequence = { KeyCombination("a"), KeyCombination("ENTER") };
+			const auto cmds = k.get_operation(key_sequence, context, binding_state, type);
+
+			THEN("a binding is found") {
+				REQUIRE(binding_state == MultiKeyBindingState::Found);
+				REQUIRE(type == BindingType::Bind);
+				REQUIRE(cmds.size() == 1);
+				REQUIRE(cmds[0].op == OP_OPEN);
+			}
+		}
+
+		WHEN("'a' followed by a different key is provided") {
+			const std::vector<KeyCombination> key_sequence = { KeyCombination("a"), KeyCombination("b") };
+			k.get_operation(key_sequence, context, binding_state, type);
+
+			THEN("no binding is found") {
+				REQUIRE(binding_state == MultiKeyBindingState::NotFound);
+			}
+		}
 	}
 }
 
@@ -34,16 +95,16 @@ TEST_CASE("unset_key() and set_key()", "[KeyMap]")
 {
 	KeyMap k(KM_NEWSBOAT);
 
-	REQUIRE(k.get_operation(KeyCombination("ENTER"), "feedlist") == OP_OPEN);
+	REQUIRE(check_single_command_binding(k, KeyCombination("ENTER"), "feedlist") == OP_OPEN);
 	REQUIRE(k.get_keys(OP_OPEN, "feedlist") == std::vector<KeyCombination>({KeyCombination("ENTER")}));
 
 	SECTION("unset_key() removes the mapping") {
 		k.unset_key(KeyCombination("ENTER"), "all");
-		REQUIRE(k.get_operation(KeyCombination("ENTER"), "feedlist") == OP_NIL);
+		check_unbound(k, KeyCombination("ENTER"), "feedlist");
 
 		SECTION("set_key() sets the mapping") {
 			k.set_key(OP_OPEN, KeyCombination("ENTER"), "all");
-			REQUIRE(k.get_operation(KeyCombination("ENTER"), "feedlist") == OP_OPEN);
+			REQUIRE(check_single_command_binding(k, KeyCombination("ENTER"), "feedlist") == OP_OPEN);
 			REQUIRE(k.get_keys(OP_OPEN, "feedlist") == std::vector<KeyCombination>({KeyCombination("ENTER")}));
 		}
 	}
@@ -85,31 +146,6 @@ TEST_CASE(
 				INFO("used in context: " << context);
 				REQUIRE(k.get_keys(static_cast<Operation>(i),
 						context) == std::vector<KeyCombination>());
-			}
-		}
-	}
-
-	SECTION("\"all\" context doesn't clear the keymap from internal keybindings") {
-		KeyMap default_keymap(KM_NEWSBOAT);
-		KeyMap unset_keymap(KM_NEWSBOAT);
-		unset_keymap.unset_all_keys("all");
-
-		for (int i = OP_INT_MIN; i < OP_INT_MAX; ++i) {
-			REQUIRE(default_keymap.get_keys(static_cast<Operation>(i), "feedlist")
-				== unset_keymap.get_keys(static_cast<Operation>(i), "feedlist"));
-		}
-	}
-
-	SECTION("Contexts don't have their internal keybindings cleared") {
-		KeyMap default_keymap(KM_NEWSBOAT);
-
-		for (const auto& context : contexts) {
-			KeyMap unset_keymap(KM_NEWSBOAT);
-			unset_keymap.unset_all_keys(context);
-
-			for (int i = OP_INT_MIN; i < OP_INT_MAX; ++i) {
-				REQUIRE(default_keymap.get_keys(static_cast<Operation>(i), context)
-					== unset_keymap.get_keys(static_cast<Operation>(i), context));
 			}
 		}
 	}
@@ -238,6 +274,50 @@ TEST_CASE("handle_action() for bind", "[KeyMap]")
 		REQUIRE_THROWS_AS(k.handle_action("bind", "a everywhere open --"), ConfigHandlerException);
 		REQUIRE_THROWS_AS(k.handle_action("bind", "a everywhere"), ConfigHandlerException);
 		REQUIRE_THROWS_AS(k.handle_action("bind", "a"), ConfigHandlerException);
+	}
+}
+
+TEST_CASE("handle_action() for unbind-key", "[KeyMap]")
+{
+	KeyMap k(KM_NEWSBOAT);
+
+	GIVEN("A multi-key binding specifying 'a' followed by ENTER") {
+		k.handle_action("bind", "a<ENTER> feedlist open");
+
+		const std::string context = "feedlist";
+		MultiKeyBindingState binding_state{};
+		BindingType type{};
+
+		WHEN("'a' key is unbound") {
+			k.handle_action("unbind-key", "a");
+
+			THEN("no binding is found") {
+				const std::vector<KeyCombination> key_sequence = { KeyCombination("a"), KeyCombination("ENTER") };
+				k.get_operation(key_sequence, context, binding_state, type);
+
+				REQUIRE(binding_state == MultiKeyBindingState::NotFound);
+			}
+		}
+
+		WHEN("a different key is unbound") {
+			k.handle_action("unbind-key", "b");
+
+			THEN("the binding is found") {
+				const std::vector<KeyCombination> key_sequence = { KeyCombination("a"), KeyCombination("ENTER") };
+				k.get_operation(key_sequence, context, binding_state, type);
+
+				REQUIRE(binding_state == MultiKeyBindingState::Found);
+			}
+		}
+	}
+
+	SECTION("unbind-key uses 'old style key binding' special key syntax") {
+		REQUIRE(check_single_command_binding(k, KeyCombination("ENTER"), "feedlist") == OP_OPEN);
+
+		// New style `bind` would specify this as `<ENTER>` instead
+		k.handle_action("unbind-key", "ENTER");
+
+		check_unbound(k, KeyCombination("ENTER"), "feedlist");
 	}
 }
 
@@ -542,7 +622,7 @@ TEST_CASE("Regression test for https://github.com/newsboat/newsboat/issues/702",
 
 		const auto macros = k.get_macro(KeyCombination("a"));
 		REQUIRE(macros.size() == 2);
-		REQUIRE(macros[0].op == OP_INT_SET);
+		REQUIRE(macros[0].op == OP_SET);
 		REQUIRE(macros[0].args == std::vector<std::string>({"browser", "firefox"}));
 		REQUIRE(macros[1].op == OP_OPENINBROWSER);
 		REQUIRE(macros[1].args == std::vector<std::string>());
@@ -553,7 +633,7 @@ TEST_CASE("Regression test for https://github.com/newsboat/newsboat/issues/702",
 
 		const auto macros = k.get_macro(KeyCombination("b"));
 		REQUIRE(macros.size() == 2);
-		REQUIRE(macros[0].op == OP_INT_SET);
+		REQUIRE(macros[0].op == OP_SET);
 		REQUIRE(macros[0].args == std::vector<std::string>({"browser", "firefox"}));
 		REQUIRE(macros[1].op == OP_OPENINBROWSER);
 		REQUIRE(macros[1].args == std::vector<std::string>());
@@ -583,7 +663,7 @@ TEST_CASE("Whitespace around semicolons in macros is optional", "[KeyMap]")
 		REQUIRE(macro[0].op == OP_OPEN);
 		REQUIRE(macro[0].args == std::vector<std::string>());
 
-		REQUIRE(macro[1].op == OP_INT_SET);
+		REQUIRE(macro[1].op == OP_SET);
 		REQUIRE(macro[1].args == std::vector<std::string>({"browser", "firefox --private-window"}));
 
 		REQUIRE(macro[2].op == OP_QUIT);
@@ -650,7 +730,7 @@ TEST_CASE("Semicolons in operation's arguments don't break parsing of a macro",
 
 	const auto macro = k.get_macro(KeyCombination("x"));
 	REQUIRE(macro.size() == 2);
-	REQUIRE(macro[0].op == OP_INT_SET);
+	REQUIRE(macro[0].op == OP_SET);
 	REQUIRE(macro[0].args == std::vector<std::string>({"browser", "sleep 3; do-something ; echo hi"}));
 	REQUIRE(macro[1].op == OP_OPENINBROWSER);
 	REQUIRE(macro[1].args == std::vector<std::string>());
@@ -680,7 +760,107 @@ TEST_CASE("prepare_keymap_hint() returns a string describing keys to which given
 	REQUIRE(k.prepare_keymap_hint(hints, "feedlist") ==
 		"<key>q</><colon>:</><desc>Get out of <>this> dialog</> "
 		"<key>?</><comma>,</><key>w</><colon>:</><desc>HALP</> "
-		"<key><></><comma>,</><key>ENTER</><comma>,</><key>x</><colon>:</><desc>Open</> "
+		"<key>ENTER</><comma>,</><key><></><comma>,</><key>x</><colon>:</><desc>Open</> "
 		"<key>O</><colon>:</><desc>Reload current entry</> "
 		"<key><>none></><colon>:</><desc>Go find me</> ");
+}
+
+TEST_CASE("get_help_info() returns info about macros, bindings, and unbound actions",
+	"[KeyMap]")
+{
+	KeyMap k(KM_NEWSBOAT);
+
+
+	GIVEN("all bindings are removed") {
+		k.unset_all_keys("feedlist");
+
+		WHEN("help info is retrieved") {
+			const auto help_info = k.get_help_info("feedlist");
+
+			THEN("the list with info about bindings is empty") {
+				REQUIRE(help_info.bindings.size() == 0);
+			}
+
+			THEN("unused actions list contains the 'open' action with a description") {
+				REQUIRE_FALSE(help_info.unused.empty());
+				const auto open_it = std::find_if(help_info.unused.begin(),
+				help_info.unused.end(), [](const UnboundAction& u) {
+					return u.op_name == "open";
+				});
+				REQUIRE(open_it != help_info.unused.end());
+				REQUIRE(open_it->description != "");
+			}
+		}
+	}
+
+	GIVEN("a registered binding without a description") {
+		k.handle_action("bind", R"(om feedlist set browser "mpv" ; open-in-browser)");
+
+		WHEN("help info is retrieved") {
+			const auto help_info = k.get_help_info("feedlist");
+
+			THEN("a description is generated from the list of actions") {
+				const auto bind_it = std::find_if(help_info.bindings.begin(),
+				help_info.bindings.end(), [](const HelpBindInfo& b) {
+					return b.key_sequence == "om";
+				});
+				REQUIRE(bind_it != help_info.bindings.end());
+				REQUIRE(bind_it->description == R"(set browser mpv; open-in-browser)");
+			}
+		}
+	}
+
+	GIVEN("a registered binding with a description") {
+		k.handle_action("bind",
+			R"(om feedlist set browser "mpv" ; open-in-browser -- "open with mpv")");
+
+		WHEN("help info is retrieved") {
+			const auto help_info = k.get_help_info("feedlist");
+
+			THEN("the provided description is included") {
+				const auto bind_it = std::find_if(help_info.bindings.begin(),
+				help_info.bindings.end(), [](const HelpBindInfo& b) {
+					return b.key_sequence == "om";
+				});
+				REQUIRE(bind_it != help_info.bindings.end());
+				REQUIRE(bind_it->description == "open with mpv");
+			}
+		}
+	}
+
+	GIVEN("a registered binding with only a single action") {
+		k.handle_action("bind", "oo feedlist open");
+
+		WHEN("help info is retrieved") {
+			const auto help_info = k.get_help_info("feedlist");
+
+			THEN("the action name and description are included in the binding info") {
+				const auto bind_it = std::find_if(help_info.bindings.begin(),
+				help_info.bindings.end(), [](const HelpBindInfo& b) {
+					return b.key_sequence == "oo";
+				});
+				REQUIRE(bind_it != help_info.bindings.end());
+				REQUIRE(bind_it->op_name == "open");
+				const char* action_description = _("Open feed/article");
+				REQUIRE(bind_it->description == action_description);
+			}
+		}
+	}
+
+	SECTION("help info with no configured macros") {
+		const auto help_info = k.get_help_info("feedlist");
+		REQUIRE(help_info.macros.size() == 0);
+	}
+
+	SECTION("help info with configured macros") {
+		k.handle_action("macro", "a open");
+		k.handle_action("macro", "b open -- \"some description\"");
+
+		const auto help_info = k.get_help_info("feedlist");
+		REQUIRE(help_info.macros.size() == 2);
+		REQUIRE(help_info.macros[0].key_sequence == "<macro-prefix>a");
+		REQUIRE(help_info.macros[0].description == "");
+		REQUIRE(help_info.macros[1].key_sequence == "<macro-prefix>b");
+		REQUIRE(help_info.macros[1].description == "some description");
+	}
 }
