@@ -14,16 +14,22 @@ FileUrlReader::FileUrlReader(const std::string& file)
 {
 }
 
-std::string FileUrlReader::get_source()
+std::string FileUrlReader::get_source() const
 {
 	return filename;
 }
 
-nonstd::optional<utils::ReadTextFileError> FileUrlReader::reload()
+void FileUrlReader::add_url(const std::string& url,
+	const std::vector<std::string>& url_tags)
+{
+	urls.push_back(url);
+	tags[url] = url_tags;
+}
+
+std::optional<utils::ReadTextFileError> FileUrlReader::reload()
 {
 	urls.clear();
 	tags.clear();
-	alltags.clear();
 
 	auto result = utils::read_text_file(filename);
 	if (!result) {
@@ -48,16 +54,13 @@ nonstd::optional<utils::ReadTextFileError> FileUrlReader::reload()
 		tokens.erase(tokens.begin());
 		if (!tokens.empty()) {
 			tags[url] = tokens;
-			for (const auto& token : tokens) {
-				alltags.insert(token);
-			}
 		}
 	};
 
 	return {};
 }
 
-nonstd::optional<std::string> FileUrlReader::write_config()
+std::optional<std::string> FileUrlReader::write_config()
 {
 	std::fstream f;
 	f.open(filename, std::fstream::out);

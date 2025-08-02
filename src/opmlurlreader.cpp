@@ -7,21 +7,22 @@
 
 namespace newsboat {
 
-OpmlUrlReader::OpmlUrlReader(ConfigContainer& c)
-	: cfg(c)
+OpmlUrlReader::OpmlUrlReader(ConfigContainer& c, const std::string& url_file)
+	: cfg(c), file(url_file)
 {
 }
 
-nonstd::optional<utils::ReadTextFileError> OpmlUrlReader::reload()
+std::optional<utils::ReadTextFileError> OpmlUrlReader::reload()
 {
 	urls.clear();
 	tags.clear();
-	alltags.clear();
 
-	std::vector<std::string> urls =
+	std::vector<std::string> opml_urls =
 		utils::tokenize_quoted(this->get_source(), " ");
 
-	for (const auto& url : urls) {
+	load_query_urls_from_file(file);
+
+	for (const auto& url : opml_urls) {
 		LOG(Level::DEBUG,
 			"OpmlUrlReader::reload: downloading `%s'",
 			url);
@@ -71,7 +72,6 @@ void OpmlUrlReader::handle_node(xmlNode* node, const std::string& tag)
 				std::vector<std::string> tmptags;
 				tmptags.push_back(tag);
 				tags[theurl] = tmptags;
-				alltags.insert(tag);
 			}
 		}
 		if (rssurl) {
@@ -108,7 +108,7 @@ void OpmlUrlReader::rec_find_rss_outlines(xmlNode* node, std::string tag)
 	}
 }
 
-std::string OpmlUrlReader::get_source()
+std::string OpmlUrlReader::get_source() const
 {
 	return cfg.get_configvalue("opml-url");
 }

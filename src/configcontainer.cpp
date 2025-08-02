@@ -43,7 +43,16 @@ ConfigContainer::ConfigContainer()
 		ConfigData(utils::get_default_browser(),
 			ConfigDataType::PATH)},
 	{"cache-file", ConfigData("", ConfigDataType::PATH)},
-	{"cleanup-on-quit", ConfigData("yes", ConfigDataType::BOOL)},
+	{
+		"cleanup-on-quit",
+		ConfigData("nudge",
+		std::unordered_set<std::string>({
+			"yes",
+			"no",
+			"nudge",
+			// true/false only added for backwards compatiblity as this option was previously a bool
+			"true",
+			"false"}))},
 	{"confirm-delete-all-articles", ConfigData("yes", ConfigDataType::BOOL)},
 	{"confirm-mark-all-feeds-read", ConfigData("yes", ConfigDataType::BOOL)},
 	{"confirm-mark-feed-read", ConfigData("yes", ConfigDataType::BOOL)},
@@ -583,6 +592,8 @@ FeedSortStrategy ConfigContainer::get_feed_sort_strategy() const
 		ss.sm = FeedSortMethod::UNREAD_ARTICLE_COUNT;
 	} else if (sortmethod == "lastupdated") {
 		ss.sm = FeedSortMethod::LAST_UPDATED;
+	} else if (sortmethod == "latestunread") {
+		ss.sm = FeedSortMethod::LATEST_UNREAD;
 	}
 
 	std::string direction = "desc";

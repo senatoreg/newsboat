@@ -127,11 +127,11 @@ REDO:
 		// i18n: This string is related to the letters in parentheses in the
 		// "Sort by (f)irsttag/..." and "Reverse Sort by
 		// (f)irsttag/..." messages
-		std::string input_options = _("ftauln");
+		std::string input_options = _("ftaulsn");
 		char c = v.confirm(
 				_("Sort by "
 					"(f)irsttag/(t)itle/(a)rticlecount/"
-					"(u)nreadarticlecount/(l)astupdated/(n)one?"),
+					"(u)nreadarticlecount/(l)astupdated/late(s)tunread/(n)one?"),
 				input_options);
 		if (!c) {
 			break;
@@ -142,7 +142,7 @@ REDO:
 		// That'll prevent this function from sorting anything, so users will
 		// complain, and we'll ask them to update the translation. A bit lame,
 		// but it's better than mishandling the answer.
-		const auto n_options = ((std::string) "ftaun").length();
+		const auto n_options = ((std::string) "ftaulsn").length();
 		if (input_options.length() < n_options) {
 			break;
 		}
@@ -162,16 +162,19 @@ REDO:
 			cfg->set_configvalue(
 				"feed-sort-order", "lastupdated-desc");
 		} else if (c == input_options.at(5)) {
+			cfg->set_configvalue(
+				"feed-sort-order", "latestunread-desc");
+		} else if (c == input_options.at(6)) {
 			cfg->set_configvalue("feed-sort-order", "none-desc");
 		}
 	}
 	break;
 	case OP_REVSORT: {
-		std::string input_options = _("ftauln");
+		std::string input_options = _("ftaulsn");
 		char c = v.confirm(
 				_("Reverse Sort by "
 					"(f)irsttag/(t)itle/(a)rticlecount/"
-					"(u)nreadarticlecount/(l)astupdated/(n)one?"),
+					"(u)nreadarticlecount/(l)astupdated/late(s)tunread/(n)one?"),
 				input_options);
 		if (!c) {
 			break;
@@ -182,7 +185,7 @@ REDO:
 		// That'll prevent this function from sorting anything, so users will
 		// complain, and we'll ask them to update the translation. A bit lame,
 		// but it's better than mishandling the answer.
-		const auto n_options = ((std::string) "ftaun").length();
+		const auto n_options = ((std::string) "ftaulsn").length();
 		if (input_options.length() < n_options) {
 			break;
 		}
@@ -201,6 +204,9 @@ REDO:
 			cfg->set_configvalue(
 				"feed-sort-order", "lastupdated-asc");
 		} else if (c == input_options.at(5)) {
+			cfg->set_configvalue(
+				"feed-sort-order", "latestunread-asc");
+		} else if (c == input_options.at(6)) {
 			cfg->set_configvalue("feed-sort-order", "none-asc");
 		}
 	}
@@ -224,7 +230,7 @@ REDO:
 
 				// We can't just `const auto exit_code = ...` here because this
 				// triggers -Wmaybe-initialized in GCC 9 with -O2.
-				nonstd::optional<std::uint8_t> exit_code;
+				std::optional<std::uint8_t> exit_code;
 				exit_code = open_unread_items_in_browser(feed, false);
 
 				if (!exit_code.has_value()) {
@@ -251,7 +257,7 @@ REDO:
 
 				// We can't just `const auto exit_code = ...` here because this
 				// triggers -Wmaybe-initialized in GCC 9 with -O2.
-				nonstd::optional<std::uint8_t> exit_code;
+				std::optional<std::uint8_t> exit_code;
 				exit_code = open_unread_items_in_browser(feed, true);
 
 				if (!exit_code.has_value()) {
@@ -560,6 +566,16 @@ bool FeedListFormAction::open_position_in_browser(unsigned int pos,
 	} else if (!feed->rssurl().empty()) {
 		url = feed->rssurl();
 		type = "rssfeed";
+
+		if (utils::is_exec_url(url)) {
+			v.get_statusline().show_error(_("Cannot open exec feeds in the browser!"));
+			return false;
+		}
+
+		if (utils::is_filter_url(url)) {
+			auto parts = utils::extract_filter(url);
+			url = std::string(parts.url);
+		}
 	} else {
 		// rssurl can't be empty, so if we got to this branch,
 		// something is clearly wrong with Newsboat internals.

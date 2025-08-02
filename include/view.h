@@ -3,10 +3,9 @@
 
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
-
-#include "3rd-party/optional.hpp"
 
 #include "formaction.h"
 #include "links.h"
@@ -83,13 +82,13 @@ public:
 		const std::string& phrase = "");
 	void view_dialogs();
 
-	nonstd::optional<std::string> run_filebrowser(const std::string& default_filename = "");
-	nonstd::optional<std::string> run_dirbrowser();
+	std::optional<std::string> run_filebrowser(const std::string& default_filename = "");
+	std::optional<std::string> run_dirbrowser();
 	std::string select_tag(const std::string& current_tag);
 	std::string select_filter(
 		const std::vector<FilterNameExprPair>& filters);
 
-	nonstd::optional<std::uint8_t> open_in_browser(const std::string& url,
+	std::optional<std::uint8_t> open_in_browser(const std::string& url,
 		const std::string& feedurl, const std::string& type, const std::string& title,
 		bool interactive);
 	void open_in_pager(const std::string& filename);
@@ -146,10 +145,6 @@ protected:
 
 	void apply_colors(std::shared_ptr<FormAction> fa);
 
-	void handle_cmdline_completion(std::shared_ptr<FormAction> fa);
-	void clear_line(std::shared_ptr<FormAction> fa);
-	void clear_eol(std::shared_ptr<FormAction> fa);
-	void delete_word(std::shared_ptr<FormAction> fa);
 	bool handle_qna_event(const std::string& event, std::shared_ptr<FormAction> fa);
 	void handle_resize();
 
@@ -174,12 +169,9 @@ protected:
 	bool is_inside_qna;
 	bool is_inside_cmdline;
 
-	std::string last_fragment;
-	unsigned int tab_count;
 	Cache* rsscache;
 	FilterContainer& filters;
 	const ColorManager& colorman;
-	std::vector<std::string> suggestions;
 
 private:
 	bool try_prepare_query_feed(std::shared_ptr<RssFeed> feed);
